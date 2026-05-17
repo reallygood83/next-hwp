@@ -59,6 +59,14 @@ npm run build
 
 ## 설계 메모
 
+## Copyright
+
+Copyright 2026. 주저작권자: reallygood83 배움의 달인.
+
+## API Key Privacy
+
+한글소리 AI / HwpVoice는 사용자가 입력한 Gemini API key와 ElevenLabs API key를 수집하거나 저장하지 않습니다. API key는 브리핑 대본 생성과 음성 합성 요청을 처리하는 동안에만 사용되며, Firestore, Firebase Storage, 공유 HTML, ZIP 파일, `/s/{id}` 공유 페이지에 포함하지 않습니다.
+
 ## Credits
 
 이 프로젝트는 macOS 한글 문서 경험을 개선하는 `alhangeul` 프로젝트와 `rhwp`/`rhwp-studio` 뷰어에서 참고와 영감을 얻었습니다. 현재 웹 MVP는 HWP/HWPX 원문 표시를 위해 bundled `rhwp-studio` WASM 뷰어를 사용합니다.
