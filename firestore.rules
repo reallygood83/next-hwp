@@ -9,12 +9,46 @@ service cloud.firestore {
     match /sharedBriefings/{shareId} {
       allow create: if request.auth != null
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.isPublic == true;
+        && request.resource.data.isPublic == true
+        && request.resource.data.keys().hasOnly([
+          "id",
+          "ownerUid",
+          "ownerEmail",
+          "title",
+          "sourceFilename",
+          "language",
+          "speechProvider",
+          "oneLineSummary",
+          "keyPoints",
+          "briefingScript",
+          "htmlBody",
+          "caveats",
+          "audioPath",
+          "audioMimeType",
+          "isPublic",
+          "createdAt",
+          "updatedAt",
+          "expiresAt",
+          "sizeBytes"
+        ])
+        && request.resource.data.id == shareId
+        && request.resource.data.briefingScript is string
+        && request.resource.data.briefingScript.size() <= 12000
+        && request.resource.data.htmlBody is string
+        && request.resource.data.htmlBody.size() <= 16000
+        && request.resource.data.sizeBytes is int
+        && request.resource.data.sizeBytes <= 10 * 1024 * 1024
+        && (
+          request.resource.data.audioPath == ""
+          || request.resource.data.audioPath.matches("^briefings/" + request.auth.uid + "/" + shareId + "/[^/]+$")
+        );
 
       allow read: if resource.data.isPublic == true
         || (request.auth != null && resource.data.ownerUid == request.auth.uid);
 
-      allow update, delete: if request.auth != null
+      allow update: if false;
+
+      allow delete: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
     }
   }

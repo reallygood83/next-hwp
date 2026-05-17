@@ -1,4 +1,5 @@
-import { firebaseConfig } from "@/lib/firebase-config";
+import { getShareById, storageMediaUrl, type ShareRecord } from "@/lib/firebase-rest";
+import { escapeHtml } from "@/lib/html-export";
 
 export const runtime = "nodejs";
 
@@ -7,62 +8,28 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const share = await readFirebaseShare(id);
+  const share = await getShareById(id);
 
-  if (!share?.htmlUrl) {
+  if (!share?.isPublic) {
     return new Response("Shared briefing page not found.", {
       status: 404,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   }
 
-  const htmlResponse = await fetch(share.htmlUrl);
-  if (!htmlResponse.ok) {
-    return new Response("Shared briefing file not found.", {
-      status: 404,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  }
-
-  const html = await htmlResponse.text();
-  return new Response(injectOpenGraph(html, share, request.url), {
+  return new Response(renderSharePage(share, request.url), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "public, max-age=3600",
+      "Content-Security-Policy":
+        "default-src 'self'; img-src 'self' data:; media-src 'self' https://firebasestorage.googleapis.com; style-src 'unsafe-inline'; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
     },
   });
 }
 
-async function readFirebaseShare(id: string) {
-  if (!/^[a-f0-9]{20}$/i.test(id)) return null;
-
-  const url = new URL(
-    `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/sharedBriefings/${id}`,
-  );
-  url.searchParams.set("key", firebaseConfig.apiKey);
-
-  const response = await fetch(url, { next: { revalidate: 60 } });
-  if (!response.ok) return null;
-
-  const body = (await response.json()) as {
-    fields?: {
-      htmlUrl?: { stringValue?: string };
-      sourceFilename?: { stringValue?: string };
-      title?: { stringValue?: string };
-      isPublic?: { booleanValue?: boolean };
-    };
-  };
-  if (!body.fields?.isPublic?.booleanValue) return null;
-  return {
-    htmlUrl: body.fields.htmlUrl?.stringValue || "",
-    sourceFilename: body.fields.sourceFilename?.stringValue || "",
-    title: body.fields.title?.stringValue || "한글소리 AI 음성 브리핑",
-  };
-}
-
-type FirebaseShare = NonNullable<Awaited<ReturnType<typeof readFirebaseShare>>>;
-
-function injectOpenGraph(html: string, share: FirebaseShare, requestUrl: string) {
+function renderSharePage(share: ShareRecord, requestUrl: string) {
   const url = new URL(requestUrl);
   const title = share.title || "한글소리 AI 음성 브리핑";
   const description = share.sourceFilename
@@ -71,37 +38,111 @@ function injectOpenGraph(html: string, share: FirebaseShare, requestUrl: string)
   const imageUrl = new URL("/og/share", url.origin);
   imageUrl.searchParams.set("title", title);
   if (share.sourceFilename) imageUrl.searchParams.set("source", share.sourceFilename);
+  const audioSrc = share.audioPath ? storageMediaUrl(share.audioPath) : "";
+  const keyPoints = share.keyPoints.map((point) => `<li>${escapeHtml(point)}</li>`).join("");
+  const caveats =
+    share.caveats.map((caveat) => `<li>${escapeHtml(caveat)}</li>`).join("") ||
+    "<li>원문 기반 AI 요약이며 중요한 판단 전 원문을 확인하세요.</li>";
 
-  const tags = [
-    `<meta name="description" content="${escapeAttribute(description)}" />`,
-    `<meta property="og:site_name" content="한글소리 AI" />`,
-    `<meta property="og:type" content="article" />`,
-    `<meta property="og:title" content="${escapeAttribute(title)}" />`,
-    `<meta property="og:description" content="${escapeAttribute(description)}" />`,
-    `<meta property="og:url" content="${escapeAttribute(url.toString())}" />`,
-    `<meta property="og:image" content="${escapeAttribute(imageUrl.toString())}" />`,
-    `<meta property="og:image:width" content="1200" />`,
-    `<meta property="og:image:height" content="630" />`,
-    `<meta name="twitter:card" content="summary_large_image" />`,
-    `<meta name="twitter:title" content="${escapeAttribute(title)}" />`,
-    `<meta name="twitter:description" content="${escapeAttribute(description)}" />`,
-    `<meta name="twitter:image" content="${escapeAttribute(imageUrl.toString())}" />`,
-  ].join("\n  ");
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeAttribute(description)}" />
+  <meta property="og:site_name" content="한글소리 AI" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="${escapeAttribute(title)}" />
+  <meta property="og:description" content="${escapeAttribute(description)}" />
+  <meta property="og:url" content="${escapeAttribute(url.toString())}" />
+  <meta property="og:image" content="${escapeAttribute(imageUrl.toString())}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeAttribute(title)}" />
+  <meta name="twitter:description" content="${escapeAttribute(description)}" />
+  <meta name="twitter:image" content="${escapeAttribute(imageUrl.toString())}" />
+  <style>
+    :root { color-scheme: light; --ink: #182230; --muted: #667085; --line: #d9dee7; --accent: #2f7f73; --soft: #edf8f6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f6f8; color: var(--ink); }
+    main { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 48px; }
+    .shell { background: white; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px rgba(24,34,48,.08); }
+    header { padding: 24px 28px 22px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #ffffff 0%, #f9fbfb 100%); }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--accent); font-weight: 900; font-size: 14px; }
+    .mark { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: white; }
+    h1 { margin: 18px 0 10px; max-width: 780px; font-size: clamp(30px, 5vw, 48px); line-height: 1.15; letter-spacing: 0; }
+    .summary { margin: 0; max-width: 760px; color: #475467; font-size: 19px; line-height: 1.7; }
+    .meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border: 1px solid #b8ded9; border-radius: 999px; background: var(--soft); color: #315b5c; font-size: 13px; font-weight: 800; }
+    .content { padding: 28px; display: grid; gap: 24px; }
+    audio { width: 100%; }
+    .audio-card, section { border: 1px solid var(--line); border-radius: 10px; padding: 20px; background: #fff; }
+    .audio-card { background: var(--soft); border-color: #b8ded9; }
+    h2 { margin: 0 0 12px; font-size: 22px; }
+    p, li { line-height: 1.75; }
+    ul { margin: 0; padding-left: 22px; }
+    .script-panel { border: 1px solid var(--line); border-radius: 10px; background: #fbfcfd; }
+    .script-panel summary { cursor: pointer; padding: 16px 18px; font-weight: 900; }
+    .script { white-space: pre-wrap; padding: 18px; border-top: 1px solid var(--line); line-height: 1.8; color: #344054; }
+    .source { color: #344054; }
+    .notice { background: #fff8ed; border-color: #f3c995; color: #8a421f; }
+    footer { padding: 18px 28px 26px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    @media (max-width: 640px) { main { width: min(100% - 20px, 960px); padding-top: 14px; } header, .content, footer { padding-left: 18px; padding-right: 18px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <article class="shell">
+      <header>
+        <div class="brand"><span class="mark">소리</span><span>한글소리 AI</span></div>
+        <h1>${escapeHtml(title)}</h1>
+        <p class="summary">${escapeHtml(share.oneLineSummary)}</p>
+        <div class="meta">
+          <span class="pill">${escapeHtml(share.sourceFilename || "공유 문서")}</span>
+          <span class="pill">${escapeHtml(share.language || "ko")}</span>
+          <span class="pill">${escapeHtml(share.speechProvider || "tts")}</span>
+        </div>
+      </header>
+      <div class="content">
+        ${
+          audioSrc
+            ? `<div class="audio-card"><h2>음성 브리핑</h2><audio controls preload="metadata" src="${escapeAttribute(audioSrc)}"></audio></div>`
+            : `<div class="audio-card"><h2>음성 브리핑</h2><p>이 공유에는 별도 오디오 파일이 포함되지 않았습니다.</p></div>`
+        }
+        <section>
+          <h2>핵심 포인트</h2>
+          <ul>${keyPoints}</ul>
+        </section>
+        <details class="script-panel">
+          <summary>브리핑 대본 펼치기</summary>
+          <div class="script">${escapeHtml(share.briefingScript)}</div>
+        </details>
+        ${share.htmlBody ? `<section class="source"><h2>요약 본문</h2>${sanitizeSafeFragment(share.htmlBody)}</section>` : ""}
+        <section class="notice">
+          <h2>주의</h2>
+          <ul>${caveats}</ul>
+          <p>한글소리 AI는 재능기부 MVP 서비스입니다. 중요한 자료는 원본 파일과 다운로드 파일을 별도로 백업해 주세요.</p>
+        </section>
+      </div>
+      <footer>
+        <span>2026 Copyright 배움의 달인</span>
+        <span>한글소리 AI / HwpVoice</span>
+      </footer>
+    </article>
+  </main>
+</body>
+</html>`;
+}
 
-  const withTitle = html.replace(/<title>.*?<\/title>/i, `<title>${escapeText(title)}</title>`);
-  if (withTitle.includes("</head>")) {
-    return withTitle.replace("</head>", `  ${tags}\n</head>`);
-  }
-  return withTitle;
+function sanitizeSafeFragment(value: string) {
+  return value
+    .replace(/<(?!\/?(p|h2|ul|li|strong)\b)[^>]*>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+='[^']*'/gi, "");
 }
 
 function escapeAttribute(value: string) {
-  return escapeText(value).replaceAll('"', "&quot;");
-}
-
-function escapeText(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return escapeHtml(value).replaceAll('"', "&quot;");
 }

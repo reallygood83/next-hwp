@@ -4,6 +4,8 @@ HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일로 바
 
 [GitHub](https://github.com/reallygood83/next-hwp) · [X @reallygood83](https://x.com/reallygood83) · [YouTube 배움의달인](https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v)
 
+> 한글소리 AI / HwpVoice는 재능기부 MVP 서비스입니다. 운영 비용, 사용량, 정책 변경에 따라 저장 기간 조정, 기능 제한, 또는 서비스 중단이 발생할 수 있습니다. 중요한 자료는 반드시 HTML, MP3, ZIP 등 로컬 파일로 별도 백업해 주세요.
+
 ## 기능
 
 - HWP 파일에서 OLE/BodyText 기반 본문 텍스트 추출
@@ -18,10 +20,12 @@ HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일로 바
 - ElevenLabs API key와 Voice ID 직접 입력 기반 선택 음성 생성
 - 외부 오디오 참조 HTML, 음성 포함 단일 HTML, HTML+오디오 zip 다운로드
 - 변환된 음성 포함 HTML을 서버 저장공간에 저장하고 `/s/{id}` 공유 링크 생성
+- 공유 저장 파일은 Firebase Storage 규칙 기준 파일당 10MB 미만으로 제한
 - Firebase Google 로그인으로 앱 사용 보호
 - 교사/공무원 대상 랜딩페이지 제공
 - 다문화 가정 학생·학부모 안내와 민원 답변을 다국어 음성 브리핑으로 배포하는 활용 시나리오 포함
-- Firebase Storage에 공유 HTML 저장, Firestore에 공유 메타데이터 저장
+- Firebase Storage에 공유 오디오 저장, Firestore에 공유 페이지용 구조화 데이터 저장
+- 사용자별 내 공유 문서 관리 페이지 제공
 
 ## 실행
 
@@ -49,6 +53,16 @@ ELEVENLABS_API_KEY=...
 ELEVENLABS_VOICE_ID=...
 ```
 
+## Self Hosting
+
+GitHub 저장소를 내려받아 직접 구축하는 사용자는 `.env.local`에 다음 값을 설정하면 공개 랜딩페이지 없이 작업페이지 중심으로 실행할 수 있습니다.
+
+```bash
+NEXT_PUBLIC_APP_ONLY=true
+```
+
+직접 구축 시에도 Firebase 프로젝트, Authentication authorized domains, Firestore rules, Storage rules를 본인 환경에 맞게 설정해야 합니다. 공개 배포용 랜딩페이지와 재능기부 MVP 안내는 운영자용 기본 서비스에 맞춘 구성이므로, 기관 내부 설치판에서는 `NEXT_PUBLIC_APP_ONLY=true` 사용을 권장합니다.
+
 ## 검증
 
 ```bash
@@ -75,6 +89,6 @@ HWP/HWPX 원문 보기는 `public/rhwp-studio/`에 포함된 `rhwp-studio` WASM 
 
 UI에 입력한 Gemini 또는 ElevenLabs API key는 브리핑 생성 요청에만 포함됩니다. 키는 서버 파일, 공유 HTML, ZIP 패키지, `/s/{id}` 공유 페이지에 저장하지 않습니다. 배포형 서비스에서는 사용자가 직접 API key를 입력해야 하며, 비워둔 상태에서는 음성 브리핑 생성을 막습니다.
 
-공유 링크는 실행 중인 서버의 `.data/shares/`에 HTML을 저장하고 `/s/{id}`로 제공합니다. 로컬에서는 같은 머신/네트워크에서 접근 가능하며, Vercel이나 별도 서버에 배포하면 공개 공유 페이지로 사용할 수 있습니다.
+공유 링크는 Firestore의 구조화된 브리핑 데이터와 Firebase Storage의 오디오 파일을 조합해 `/s/{id}` 서버 템플릿으로 제공합니다. 공유 페이지는 임의 HTML을 그대로 실행하지 않고 CSP를 적용합니다.
 
-서버 비용과 유지 비용 선택지는 [Deployment and Cost Notes](docs/deployment-costs.md)를 참고하세요. 현재 파일시스템 공유 저장소는 로컬 데모용이며, 공개 운영에서는 object storage adapter로 바꾸는 편이 안전합니다.
+서버 비용과 유지 비용 선택지는 [Deployment and Cost Notes](docs/deployment-costs.md)를 참고하세요. 공개 운영에서는 사용자별 저장 개수 제한, 파일당 10MB 제한, 만료 정책, 로컬 백업 안내를 함께 유지하는 편이 안전합니다.

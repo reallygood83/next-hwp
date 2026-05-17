@@ -21,13 +21,14 @@ import JSZip from "jszip";
 import type { User } from "firebase/auth";
 import { buildBriefingHtml } from "@/lib/html-export";
 import {
-  createFirebaseShare,
+  firebaseStorage,
   getFirebaseAnalytics,
   listenToAuth,
   signInWithGoogle,
   signOutUser,
 } from "@/lib/firebase";
 import { extractTextFromFile } from "@/lib/hwpx";
+import { ref, uploadString } from "firebase/storage";
 import type {
   BriefingDuration,
   BriefingLanguage,
@@ -140,6 +141,15 @@ function LandingPage({
             <Download size={16} />
             다운로드
           </a>
+          <Link className="secondary compact-button nav-link" href="/notice">
+            <AlertTriangle size={16} />
+            주의사항
+          </Link>
+          {isSignedIn ? (
+            <Link className="secondary compact-button nav-link" href="/my">
+              내 공유 문서
+            </Link>
+          ) : null}
           {isSignedIn ? (
             <Link className="secondary compact-button nav-link" href="/app">
               <Lock size={16} />
@@ -225,6 +235,11 @@ function LandingPage({
           원문 문서는 기본 저장하지 않고, API key는 요청 단위로만 사용합니다. 학생 개인정보,
           연락처, 주소가 포함된 문서는 비식별 후 외부 AI API로 전송하는 것이 안전합니다.
         </p>
+        <p>
+          한글소리 AI는 재능기부 MVP 서비스입니다. 운영 비용과 사용량에 따라 기능 제한,
+          저장 기간 조정, 서비스 중단이 발생할 수 있으므로 중요한 자료는 항상 로컬 파일로
+          백업해 두세요.
+        </p>
       </section>
 
       <footer className="landing-footer">
@@ -237,7 +252,7 @@ function LandingPage({
   );
 }
 
-type HwpVoiceAppMode = "landing" | "workspace";
+type HwpVoiceAppMode = "landing" | "workspace" | "workspaceOnly";
 
 export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceAppMode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -473,34 +488,65 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
     );
   }
 
-  function makeEmbeddedHtml() {
-    if (!result) return "";
-    return buildBriefingHtml(result, {
-      audioFilename: safeBaseName(filename) + "-briefing." + audioExtension(audio?.mimeType),
-      embeddedAudio: audio,
-      sourceHtml: documentHtml,
-      originalDocument: originalDocumentPayload(),
-    });
-  }
-
   async function createShareLink() {
-    const html = makeEmbeddedHtml();
-    if (!html) return;
-
     if (!user || !result) {
       setError("공유 페이지를 만들지 못했습니다.");
       return;
     }
 
     try {
-      const shared = await createFirebaseShare({
-        user,
-        html,
-        title: result.title,
-        sourceFilename: filename,
-        language: briefingLanguage,
-        speechProvider,
+      const id = crypto.randomUUID().replaceAll("-", "").slice(0, 20);
+      const idToken = await user.getIdToken();
+      const shareListResponse = await fetch("/api/shares", {
+        headers: { Authorization: `Bearer ${idToken}` },
       });
+      if (shareListResponse.ok) {
+        const shareList = (await shareListResponse.json()) as { shares?: unknown[] };
+        if ((shareList.shares || []).length >= 3) {
+          throw new Error("공유 저장공간은 사용자당 3개까지입니다. 내 공유 문서에서 기존 항목을 삭제하세요.");
+        }
+      }
+
+      let audioPath = "";
+      let uploadedBytes = 0;
+      if (audio) {
+        audioPath = `briefings/${user.uid}/${id}/briefing.${audioExtension(audio.mimeType)}`;
+        uploadedBytes = Math.ceil((audio.base64.length * 3) / 4);
+        if (uploadedBytes > 10 * 1024 * 1024) {
+          throw new Error("공유 오디오 파일은 10MB 미만이어야 합니다. 로컬 저장을 사용하세요.");
+        }
+        await uploadString(ref(firebaseStorage, audioPath), audio.base64, "base64", {
+          contentType: audio.mimeType,
+          customMetadata: {
+            ownerUid: user.uid,
+            shareId: id,
+          },
+        });
+      }
+
+      const response = await fetch("/api/share", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+          briefing: result,
+          sourceFilename: filename,
+          language: briefingLanguage,
+          speechProvider,
+          audioPath,
+          audioMimeType: audio?.mimeType || "",
+          sizeBytes: uploadedBytes,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || "공유 페이지를 만들지 못했습니다.");
+      }
+      const shared = (await response.json()) as { id: string };
       setShareUrl(new URL(`/s/${shared.id}`, window.location.origin).toString());
     } catch (reason) {
       setError(
@@ -561,6 +607,56 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
   }
 
   if (!user) {
+    if (mode === "workspaceOnly") {
+      return (
+        <main className="app-shell">
+          <header className="topbar">
+            <Link className="brand brand-link" href="/">
+              <span className="brand-mark">
+                <FileAudio size={18} aria-hidden="true" />
+              </span>
+              <span className="brand-text">
+                <span className="brand-title">한글소리 AI</span>
+                <span className="brand-subtitle">HwpVoice</span>
+              </span>
+            </Link>
+            <div className="topbar-actions">
+              <Link className="account-button nav-link" href="/notice">
+                <AlertTriangle size={14} />
+                주의사항
+              </Link>
+              <Link className="account-button nav-link" href="/my">
+                내 공유 문서
+              </Link>
+              <a className="account-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
+                <Download size={14} />
+                다운로드
+              </a>
+            </div>
+          </header>
+          <section className="auth-gate">
+            <div>
+              <p className="eyebrow">Self-host workspace</p>
+              <h1>Google 로그인 후 작업페이지를 사용하세요.</h1>
+              <p>
+                GitHub로 직접 구축한 환경에서는 랜딩페이지 없이 작업 화면 중심으로 실행할 수
+                있습니다. Google 로그인은 사용자별 공유 저장소 소유자를 구분하기 위해 사용합니다.
+              </p>
+              <p>
+                Drive 권한은 요청하지 않으며, Gemini와 ElevenLabs API key는 수집하거나 저장하지
+                않습니다.
+              </p>
+              <button className="primary hero-button" disabled={!authReady} onClick={() => void handleSignIn()}>
+                <Lock size={18} />
+                Google 로그인
+              </button>
+              {authError ? <div className="error">{authError}</div> : null}
+            </div>
+          </section>
+        </main>
+      );
+    }
+
     return (
       <LandingPage
         authReady={authReady}
@@ -592,6 +688,13 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
             <Download size={14} />
             다운로드
           </a>
+          <Link className="account-button nav-link" href="/notice">
+            <AlertTriangle size={14} />
+            주의사항
+          </Link>
+          <Link className="account-button nav-link" href="/my">
+            내 공유 문서
+          </Link>
           <button className="account-button" onClick={() => void handleSignOut()}>
             {user.displayName || user.email || "사용자"} 로그아웃
           </button>
@@ -926,7 +1029,9 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
                     </a>
                     <p>
                       Firebase Storage에 저장된 공유 페이지입니다. 공개 URL이므로 배포 전
-                      개인정보 포함 여부를 확인하세요.
+                      개인정보 포함 여부를 확인하세요. 재능기부 MVP 서비스라 저장 정책이 바뀌거나
+                      서비스가 중단될 수 있으니 HTML/MP3/ZIP 파일을 반드시 별도 백업하세요.
+                      사용자당 공유 저장은 최대 3개입니다.
                     </p>
                     <button className="secondary" onClick={() => void copyShareLink()}>
                       <Copy size={16} />
@@ -942,9 +1047,17 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
 
       <footer className="app-footer">
         <span>2026 Copyright 배움의 달인</span>
-        <a className="secondary compact-button nav-link" href={youtubeUrl} target="_blank" rel="noreferrer">
-          배움의 달인 유튜브 바로가기
-        </a>
+        <div className="footer-actions">
+          <Link className="secondary compact-button nav-link" href="/notice">
+            주의사항
+          </Link>
+          <Link className="secondary compact-button nav-link" href="/my">
+            내 공유 문서
+          </Link>
+          <a className="secondary compact-button nav-link" href={youtubeUrl} target="_blank" rel="noreferrer">
+            배움의 달인 유튜브 바로가기
+          </a>
+        </div>
       </footer>
     </main>
   );
