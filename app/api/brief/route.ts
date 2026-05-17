@@ -17,6 +17,10 @@ export async function POST(request: Request) {
     const warnings: string[] = [];
     let audio: BriefingResponse["audio"];
     const provider = body.speechProvider || "gemini";
+    const credentialError = validateSpeechCredentials(body, provider);
+    if (credentialError) {
+      return Response.json({ error: credentialError }, { status: 400 });
+    }
 
     try {
       if (provider === "elevenlabs") {
@@ -60,6 +64,19 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function validateSpeechCredentials(body: BriefingRequest, provider: NonNullable<BriefingRequest["speechProvider"]>) {
+  if (provider === "elevenlabs") {
+    if (!body.elevenLabsApiKey?.trim() || !body.elevenLabsVoiceId?.trim()) {
+      return "ElevenLabs API key and Voice ID are required.";
+    }
+    return null;
+  }
+  if (!body.geminiApiKey?.trim()) {
+    return "Gemini API key is required.";
+  }
+  return null;
 }
 
 function validate(body: BriefingRequest) {

@@ -182,6 +182,10 @@ export default function Home() {
     if (!audio) return "";
     return `data:${audio.mimeType};base64,${audio.base64}`;
   }, [audio]);
+  const isMissingSpeechCredential =
+    speechProvider === "gemini"
+      ? !geminiApiKey.trim()
+      : !elevenLabsApiKey.trim() || !elevenLabsVoiceId.trim();
 
   useEffect(() => {
     void getFirebaseAnalytics();
@@ -517,7 +521,7 @@ export default function Home() {
                   autoComplete="off"
                   value={geminiApiKey}
                   onChange={(event) => setGeminiApiKey(event.target.value)}
-                  placeholder="비워두면 서버 환경변수 GEMINI_API_KEY를 사용합니다."
+                  placeholder="Gemini API key를 입력하세요."
                 />
               </div>
               <div className="field">
@@ -563,7 +567,7 @@ export default function Home() {
                   autoComplete="off"
                   value={elevenLabsApiKey}
                   onChange={(event) => setElevenLabsApiKey(event.target.value)}
-                  placeholder="비워두면 서버 환경변수 ELEVENLABS_API_KEY를 사용합니다."
+                  placeholder="ElevenLabs API key를 입력하세요."
                 />
               </div>
               <div className="field">
@@ -601,11 +605,19 @@ export default function Home() {
             </div>
           ))}
           {error ? <div className="error">{error}</div> : null}
+          {isMissingSpeechCredential ? (
+            <div className="error">
+              <AlertTriangle size={15} aria-hidden="true" />
+              {speechProvider === "gemini"
+                ? "Gemini API key를 입력해야 음성 브리핑을 만들 수 있습니다."
+                : "ElevenLabs API key와 Voice ID를 입력해야 음성 브리핑을 만들 수 있습니다."}
+            </div>
+          ) : null}
 
           <div className="actions">
             <button
               className="primary"
-              disabled={isBusy || text.trim().length < 20}
+              disabled={isBusy || text.trim().length < 20 || isMissingSpeechCredential}
               onClick={() => void createBriefing()}
             >
               {isBusy ? <Loader2 size={17} aria-hidden="true" /> : <FileAudio size={17} />}

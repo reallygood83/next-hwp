@@ -51,7 +51,7 @@ npm run build
 
 HWP/HWPX 원문 보기는 `public/rhwp-studio/`에 포함된 `rhwp-studio` WASM 뷰어를 iframe으로 로드하고, 업로드한 파일 bytes를 `postMessage`로 전달합니다. 브리핑용 본문은 별도로 HWP OLE `BodyText/Section*` 또는 HWPX XML에서 추출합니다. 서버 API는 문서 원문과 API key를 로그에 남기지 않도록 작성되어 있습니다.
 
-UI에 입력한 Gemini 또는 ElevenLabs API key는 브리핑 생성 요청에만 포함됩니다. 키는 서버 파일, 공유 HTML, ZIP 패키지, `/s/{id}` 공유 페이지에 저장하지 않습니다. 운영 배포에서는 HTTPS와 서버 로그 마스킹을 전제로 두고, 가능하면 서버 환경변수 또는 사용자별 secret vault로 옮기는 것이 안전합니다.
+UI에 입력한 Gemini 또는 ElevenLabs API key는 브리핑 생성 요청에만 포함됩니다. 키는 서버 파일, 공유 HTML, ZIP 패키지, `/s/{id}` 공유 페이지에 저장하지 않습니다. 배포형 서비스에서는 사용자가 직접 API key를 입력해야 하며, 비워둔 상태에서는 음성 브리핑 생성을 막습니다.
 
 공유 링크는 실행 중인 서버의 `.data/shares/`에 HTML을 저장하고 `/s/{id}`로 제공합니다. 로컬에서는 같은 머신/네트워크에서 접근 가능하며, Vercel이나 별도 서버에 배포하면 공개 공유 페이지로 사용할 수 있습니다.
 
