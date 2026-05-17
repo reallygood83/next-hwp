@@ -18,7 +18,7 @@ export async function GET(request: Request) {
           position: "relative",
           overflow: "hidden",
           background: "#0f172a",
-        fontFamily: "sans-serif",
+          fontFamily: "sans-serif",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -49,6 +49,11 @@ export async function GET(request: Request) {
             display: "flex",
             alignItems: "center",
             gap: 18,
+            padding: "16px 22px 16px 16px",
+            borderRadius: 26,
+            background: "rgba(7, 20, 32, .78)",
+            border: "1px solid rgba(153, 246, 228, .32)",
+            boxShadow: "0 18px 48px rgba(0,0,0,.32)",
           }}
         >
           <div
@@ -71,8 +76,28 @@ export async function GET(request: Request) {
             </svg>
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ color: "#ffffff", fontSize: 42, fontWeight: 800 }}>한글소리 AI</div>
-            <div style={{ color: "#99f6e4", fontSize: 21, fontWeight: 700 }}>HwpVoice</div>
+            <div
+              style={{
+                color: "#ffffff",
+                fontSize: 44,
+                fontWeight: 800,
+                lineHeight: 1.08,
+                textShadow: "0 3px 14px rgba(0,0,0,.55)",
+              }}
+            >
+              한글소리 AI
+            </div>
+            <div
+              style={{
+                color: "#5eead4",
+                fontSize: 22,
+                fontWeight: 800,
+                lineHeight: 1.25,
+                textShadow: "0 2px 10px rgba(0,0,0,.45)",
+              }}
+            >
+              HwpVoice
+            </div>
           </div>
         </div>
         <div

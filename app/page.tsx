@@ -43,6 +43,7 @@ const sampleText =
 
 const sampleHtml = textToPreviewHtml(sampleText);
 const githubUrl = "https://github.com/reallygood83/next-hwp";
+const youtubeUrl = "https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v";
 
 const geminiTtsModels = [
   { value: "gemini-2.5-flash-preview-tts", label: "Gemini 2.5 Flash TTS Preview" },
@@ -206,6 +207,13 @@ function LandingPage({
           연락처, 주소가 포함된 문서는 비식별 후 외부 AI API로 전송하는 것이 안전합니다.
         </p>
       </section>
+
+      <footer className="landing-footer">
+        <span>2026 Copyright 배움의 달인</span>
+        <a className="secondary compact-button nav-link" href={youtubeUrl} target="_blank" rel="noreferrer">
+          배움의 달인 유튜브 바로가기
+        </a>
+      </footer>
     </main>
   );
 }

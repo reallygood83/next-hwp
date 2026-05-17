@@ -284,6 +284,20 @@ a {
   margin: 0 auto 38px;
 }
 
+.landing-footer {
+  width: min(1180px, calc(100% - 44px));
+  min-height: 72px;
+  margin: 0 auto;
+  padding: 18px 0 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .workspace {
   width: min(1420px, 100%);
   margin: 0 auto;
@@ -746,6 +760,11 @@ audio {
   .doc-page {
     min-height: 620px;
     padding: 38px 34px;
+  }
+
+  .landing-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
