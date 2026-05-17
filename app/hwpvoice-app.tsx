@@ -113,12 +113,16 @@ const briefingLanguages: Array<{ value: BriefingLanguage; label: string }> = [
 function LandingPage({
   authReady,
   authError,
+  user,
   onSignIn,
 }: {
   authReady: boolean;
   authError: string;
+  user: User | null;
   onSignIn: () => void;
 }) {
+  const isSignedIn = Boolean(user);
+
   return (
     <main className="landing">
       <nav className="landing-nav">
@@ -136,10 +140,17 @@ function LandingPage({
             <Download size={16} />
             다운로드
           </a>
-          <button className="secondary compact-button" disabled={!authReady} onClick={onSignIn}>
-            <Lock size={16} />
-            Google로 시작
-          </button>
+          {isSignedIn ? (
+            <Link className="secondary compact-button nav-link" href="/app">
+              <Lock size={16} />
+              작업페이지로 이동
+            </Link>
+          ) : (
+            <button className="secondary compact-button" disabled={!authReady} onClick={onSignIn}>
+              <Lock size={16} />
+              Google로 시작
+            </button>
+          )}
         </div>
       </nav>
 
@@ -157,10 +168,17 @@ function LandingPage({
             학교생활 안내를 여러 언어의 음성 브리핑으로 바꿔 접근성을 높일 수 있습니다.
           </p>
           <div className="landing-actions">
-            <button className="primary hero-button" disabled={!authReady} onClick={onSignIn}>
-              <Lock size={18} />
-              Google 로그인 후 사용
-            </button>
+            {isSignedIn ? (
+              <Link className="primary hero-button nav-link" href="/app">
+                <Lock size={18} />
+                작업페이지로 돌아가기
+              </Link>
+            ) : (
+              <button className="primary hero-button" disabled={!authReady} onClick={onSignIn}>
+                <Lock size={18} />
+                Google 로그인 후 사용
+              </button>
+            )}
             <span>개인 API key를 직접 입력해 사용합니다.</span>
           </div>
           {authError ? <div className="error">{authError}</div> : null}
@@ -532,6 +550,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
       <LandingPage
         authReady={authReady}
         authError={authError}
+        user={user}
         onSignIn={() => {
           void handleSignIn().then(() => {
             window.location.href = "/app";
@@ -546,6 +565,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
       <LandingPage
         authReady={authReady}
         authError={authError}
+        user={user}
         onSignIn={() => void handleSignIn()}
       />
     );
