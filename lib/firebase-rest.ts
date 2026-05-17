@@ -207,6 +207,20 @@ export async function deleteShareDocument(idToken: string, id: string) {
   return response.ok;
 }
 
+export async function deleteStorageObject(idToken: string, path: string) {
+  if (!path) return true;
+  const response = await fetch(
+    `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(
+      path,
+    )}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${idToken}` },
+    },
+  );
+  return response.ok || response.status === 404;
+}
+
 export function storageMediaUrl(path: string) {
   return `https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(
     path,

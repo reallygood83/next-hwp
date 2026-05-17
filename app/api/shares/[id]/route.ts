@@ -1,4 +1,9 @@
-import { deleteShareDocument, getShareById, verifyFirebaseIdToken } from "@/lib/firebase-rest";
+import {
+  deleteShareDocument,
+  deleteStorageObject,
+  getShareById,
+  verifyFirebaseIdToken,
+} from "@/lib/firebase-rest";
 
 export const runtime = "nodejs";
 
@@ -23,6 +28,9 @@ export async function DELETE(
       return Response.json({ error: "Share not found." }, { status: 404 });
     }
 
+    if (share.audioPath) {
+      await deleteStorageObject(idToken, share.audioPath);
+    }
     await deleteShareDocument(idToken, id);
     return Response.json({ ok: true });
   } catch {
