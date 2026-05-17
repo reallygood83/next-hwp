@@ -8,6 +8,7 @@ import {
   FileText,
   FileType,
   Loader2,
+  Lock,
   Mic,
   Package,
   Share2,
@@ -16,7 +17,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
+import type { User } from "firebase/auth";
 import { buildBriefingHtml } from "@/lib/html-export";
+import { getFirebaseAnalytics, listenToAuth, signInWithGoogle, signOutUser } from "@/lib/firebase";
 import { extractTextFromFile } from "@/lib/hwpx";
 import type {
   BriefingDuration,
@@ -60,7 +63,96 @@ const briefingLanguages: Array<{ value: BriefingLanguage; label: string }> = [
   { value: "zh", label: "中文" },
 ];
 
+function LandingPage({
+  authReady,
+  authError,
+  onSignIn,
+}: {
+  authReady: boolean;
+  authError: string;
+  onSignIn: () => void;
+}) {
+  return (
+    <main className="landing">
+      <nav className="landing-nav">
+        <div className="brand">
+          <span className="brand-mark">
+            <Mic size={18} aria-hidden="true" />
+          </span>
+          <span>Next HWP Briefing</span>
+        </div>
+        <button className="secondary compact-button" disabled={!authReady} onClick={onSignIn}>
+          <Lock size={16} />
+          Google로 시작
+        </button>
+      </nav>
+
+      <section className="landing-hero">
+        <div className="landing-copy">
+          <p className="eyebrow">교사와 공공 실무자를 위한 한글 문서 브리핑</p>
+          <h1>한글 문서를 편집하고, 음성 브리핑 HTML로 배포합니다.</h1>
+          <p>
+            HWP/HWPX 원문을 브라우저에서 확인하고 필요한 수정을 마친 뒤 Gemini TTS
+            또는 ElevenLabs로 짧은 음성 브리핑을 생성합니다. 공유용 HTML과 오디오 파일까지
+            한 흐름에서 만들 수 있습니다.
+          </p>
+          <p>
+            다문화 가정 학생과 학부모에게 전달해야 하는 안내문, 민원 답변, 연수 공지,
+            학교생활 안내를 여러 언어의 음성 브리핑으로 바꿔 접근성을 높일 수 있습니다.
+          </p>
+          <div className="landing-actions">
+            <button className="primary hero-button" disabled={!authReady} onClick={onSignIn}>
+              <Lock size={18} />
+              Google 로그인 후 사용
+            </button>
+            <span>개인 API key를 직접 입력해 사용합니다.</span>
+          </div>
+          {authError ? <div className="error">{authError}</div> : null}
+        </div>
+        <div className="landing-preview" aria-hidden="true">
+          <div className="preview-toolbar">HWP 문서 → AI 브리핑 → 공유 HTML</div>
+          <div className="preview-doc">
+            <strong>연수 계획 보고서</strong>
+            <p>핵심 일정, 대상, 예산, 유의사항을 음성 대본으로 요약합니다.</p>
+            <div className="preview-wave" />
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-grid" aria-label="활용 방식">
+        <article>
+          <h2>문서 작성부터</h2>
+          <p>내장 rhwp 편집기로 한글 문서를 열고 수정한 뒤 편집본을 브리핑 입력에 반영합니다.</p>
+        </article>
+        <article>
+          <h2>음성 브리핑까지</h2>
+          <p>한국어, 영어, 일본어, 중국어 브리핑 언어를 선택하고 Gemini TTS를 기본으로 사용합니다.</p>
+        </article>
+        <article>
+          <h2>공유와 배포</h2>
+          <p>음성 포함 HTML, HTML+오디오 zip, 공유 링크를 생성해 회의 전 브리핑 자료로 배포합니다.</p>
+        </article>
+        <article>
+          <h2>다문화 민원 안내</h2>
+          <p>복잡한 한글 안내문을 학부모가 이해하기 쉬운 다국어 음성 콘텐츠로 바꿉니다.</p>
+        </article>
+      </section>
+
+      <section className="trust-band">
+        <h2>공공 문서 사용을 고려한 기본 원칙</h2>
+        <p>
+          원문 문서는 기본 저장하지 않고, API key는 요청 단위로만 사용합니다. 학생 개인정보,
+          연락처, 주소가 포함된 문서는 비식별 후 외부 AI API로 전송하는 것이 안전합니다.
+        </p>
+      </section>
+    </main>
+  );
+}
+
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [filename, setFilename] = useState("sample.txt");
   const [text, setText] = useState(sampleText);
   const [documentHtml, setDocumentHtml] = useState(sampleHtml);
@@ -90,6 +182,30 @@ export default function Home() {
     if (!audio) return "";
     return `data:${audio.mimeType};base64,${audio.base64}`;
   }, [audio]);
+
+  useEffect(() => {
+    void getFirebaseAnalytics();
+    return listenToAuth((nextUser) => {
+      setUser(nextUser);
+      setAuthReady(true);
+    });
+  }, []);
+
+  async function handleSignIn() {
+    setAuthError("");
+    try {
+      await signInWithGoogle();
+    } catch (reason) {
+      setAuthError(reason instanceof Error ? reason.message : "Google 로그인에 실패했습니다.");
+    }
+  }
+
+  async function handleSignOut() {
+    await signOutUser();
+    setResult(null);
+    setAudio(undefined);
+    setShareUrl("");
+  }
 
   async function handleFile(file: File | null) {
     if (!file) return;
@@ -280,6 +396,16 @@ export default function Home() {
 
   const isBusy = state === "extracting" || state === "briefing";
 
+  if (!user) {
+    return (
+      <LandingPage
+        authReady={authReady}
+        authError={authError}
+        onSignIn={() => void handleSignIn()}
+      />
+    );
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -293,6 +419,9 @@ export default function Home() {
           <Sparkles size={15} aria-hidden="true" />
           Gemini TTS 기본
         </span>
+        <button className="account-button" onClick={() => void handleSignOut()}>
+          {user.displayName || user.email || "사용자"} 로그아웃
+        </button>
       </header>
 
       <div className="workspace">
