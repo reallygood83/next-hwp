@@ -11,6 +11,7 @@ HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일로 바
 - 텍스트 직접 붙여넣기 지원
 - Gemini structured output 기반 브리핑 대본 생성
 - 한국어/영어/일본어/중국어 브리핑 언어 선택
+- 업무보고, 가정통신문, 학부모 안내, 민원 답변, 보고용 요약, 연수 안내, 회의 브리핑, 쉬운 말 설명, 다문화 가정 안내 등 브리핑 스타일 선택
 - Gemini TTS 기본 음성 생성
 - ElevenLabs API key와 Voice ID 직접 입력 기반 선택 음성 생성
 - 외부 오디오 참조 HTML, 음성 포함 단일 HTML, HTML+오디오 zip 다운로드
@@ -18,6 +19,7 @@ HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일로 바
 - Firebase Google 로그인으로 앱 사용 보호
 - 교사/공무원 대상 랜딩페이지 제공
 - 다문화 가정 학생·학부모 안내와 민원 답변을 다국어 음성 브리핑으로 배포하는 활용 시나리오 포함
+- Firebase Storage에 공유 HTML 저장, Firestore에 공유 메타데이터 저장
 
 ## 실행
 
@@ -28,6 +30,12 @@ npm run dev
 ```
 
 Firebase 웹 앱 config는 `lib/firebase.ts`에 포함되어 있습니다. Firebase Console에서 Google 로그인 공급자를 활성화하고, 배포 도메인을 Authentication authorized domains에 추가해야 합니다.
+
+Firebase 보안 규칙은 다음 명령으로 배포합니다.
+
+```bash
+firebase deploy --only firestore:rules,storage
+```
 
 `.env.local`에 다음 값을 설정합니다.
 

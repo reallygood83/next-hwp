@@ -1,10 +1,21 @@
 export type BriefingDuration = "short" | "standard" | "deep";
 
-export type BriefingStyle = "work" | "study" | "news";
+export type BriefingStyle =
+  | "work"
+  | "study"
+  | "news"
+  | "family-letter"
+  | "parent-notice"
+  | "civil-service"
+  | "executive-report"
+  | "training"
+  | "meeting"
+  | "easy"
+  | "multicultural";
 
 export type SpeechProvider = "gemini" | "elevenlabs";
 
-export type BriefingLanguage = "ko" | "en" | "ja" | "zh";
+export type BriefingLanguage = string;
 
 export type BriefingRequest = {
   filename: string;

@@ -10,19 +10,14 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAzJWs_4Fe8Mt6z8PET1dHGsF9xBXUjX00",
-  authDomain: "next-hwp.firebaseapp.com",
-  projectId: "next-hwp",
-  storageBucket: "next-hwp.firebasestorage.app",
-  messagingSenderId: "175340390118",
-  appId: "1:175340390118:web:1d02ec7685f1c4e78a1d27",
-  measurementId: "G-RL19BQVS6P",
-};
+import { doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
+import { getDownloadURL, getStorage, ref, uploadString } from "firebase/storage";
+import { firebaseConfig } from "./firebase-config";
 
 export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
+export const firebaseDb = getFirestore(firebaseApp);
+export const firebaseStorage = getStorage(firebaseApp);
 
 let analyticsPromise: Promise<Analytics | null> | null = null;
 
@@ -47,4 +42,61 @@ export async function signInWithGoogle() {
 
 export function signOutUser() {
   return signOut(firebaseAuth);
+}
+
+export type FirebaseShareInput = {
+  user: User;
+  html: string;
+  title: string;
+  sourceFilename: string;
+  language: string;
+  speechProvider: string;
+};
+
+export async function createFirebaseShare({
+  user,
+  html,
+  title,
+  sourceFilename,
+  language,
+  speechProvider,
+}: FirebaseShareInput) {
+  const id = crypto.randomUUID().replaceAll("-", "").slice(0, 20);
+  const htmlPath = `briefings/${user.uid}/${id}/briefing.html`;
+  const htmlRef = ref(firebaseStorage, htmlPath);
+
+  await uploadString(htmlRef, html, "raw", {
+    contentType: "text/html; charset=utf-8",
+    customMetadata: {
+      ownerUid: user.uid,
+      shareId: id,
+    },
+  });
+
+  const htmlUrl = await getDownloadURL(htmlRef);
+  await setDoc(doc(firebaseDb, "sharedBriefings", id), {
+    ownerUid: user.uid,
+    ownerEmail: user.email || "",
+    title,
+    sourceFilename,
+    language,
+    speechProvider,
+    htmlPath,
+    htmlUrl,
+    isPublic: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await setDoc(
+    doc(firebaseDb, "users", user.uid),
+    {
+      email: user.email || "",
+      displayName: user.displayName || "",
+      lastActiveAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  return { id, htmlUrl };
 }

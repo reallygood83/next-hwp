@@ -19,7 +19,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { User } from "firebase/auth";
 import { buildBriefingHtml } from "@/lib/html-export";
-import { getFirebaseAnalytics, listenToAuth, signInWithGoogle, signOutUser } from "@/lib/firebase";
+import {
+  createFirebaseShare,
+  getFirebaseAnalytics,
+  listenToAuth,
+  signInWithGoogle,
+  signOutUser,
+} from "@/lib/firebase";
 import { extractTextFromFile } from "@/lib/hwpx";
 import type {
   BriefingDuration,
@@ -61,6 +67,44 @@ const briefingLanguages: Array<{ value: BriefingLanguage; label: string }> = [
   { value: "en", label: "English" },
   { value: "ja", label: "日本語" },
   { value: "zh", label: "中文" },
+  { value: "vi", label: "Tiếng Việt" },
+  { value: "ru", label: "Русский" },
+  { value: "mn", label: "Монгол" },
+  { value: "th", label: "ไทย" },
+  { value: "id", label: "Bahasa Indonesia" },
+  { value: "tl", label: "Filipino / Tagalog" },
+  { value: "km", label: "ភាសាខ្មែរ" },
+  { value: "my", label: "မြန်မာ" },
+  { value: "lo", label: "ລາວ" },
+  { value: "ms", label: "Bahasa Melayu" },
+  { value: "hi", label: "हिन्दी" },
+  { value: "bn", label: "বাংলা" },
+  { value: "ur", label: "اردو" },
+  { value: "ne", label: "नेपाली" },
+  { value: "ta", label: "தமிழ்" },
+  { value: "te", label: "తెలుగు" },
+  { value: "ar", label: "العربية" },
+  { value: "fa", label: "فارسی" },
+  { value: "tr", label: "Türkçe" },
+  { value: "he", label: "עברית" },
+  { value: "fr", label: "Français" },
+  { value: "es", label: "Español" },
+  { value: "de", label: "Deutsch" },
+  { value: "it", label: "Italiano" },
+  { value: "pt", label: "Português" },
+  { value: "nl", label: "Nederlands" },
+  { value: "pl", label: "Polski" },
+  { value: "uk", label: "Українська" },
+  { value: "cs", label: "Čeština" },
+  { value: "sk", label: "Slovenčina" },
+  { value: "hu", label: "Magyar" },
+  { value: "ro", label: "Română" },
+  { value: "bg", label: "Български" },
+  { value: "el", label: "Ελληνικά" },
+  { value: "sv", label: "Svenska" },
+  { value: "da", label: "Dansk" },
+  { value: "fi", label: "Suomi" },
+  { value: "no", label: "Norsk" },
 ];
 
 function LandingPage({
@@ -172,6 +216,8 @@ export default function Home() {
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState("");
   const [elevenLabsModelId, setElevenLabsModelId] = useState("eleven_multilingual_v2");
   const [state, setState] = useState<WorkState>("idle");
+  const [briefingProgress, setBriefingProgress] = useState(0);
+  const [briefingProgressLabel, setBriefingProgressLabel] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [result, setResult] = useState<BriefingResult | null>(null);
@@ -263,12 +309,33 @@ export default function Home() {
 
   async function createBriefing() {
     setState("briefing");
+    setBriefingProgress(8);
+    setBriefingProgressLabel("문서 내용을 정리하고 있습니다.");
     setError("");
     setResult(null);
     setAudio(undefined);
     setShareUrl("");
+    let progressTimer: number | undefined;
 
     try {
+      progressTimer = window.setInterval(() => {
+        setBriefingProgress((current) => {
+          if (current < 32) {
+            setBriefingProgressLabel("브리핑 대본을 생성하고 있습니다.");
+            return current + 4;
+          }
+          if (current < 68) {
+            setBriefingProgressLabel("선택한 언어로 핵심 내용을 구성하고 있습니다.");
+            return current + 3;
+          }
+          if (current < 88) {
+            setBriefingProgressLabel("음성 파일을 합성하고 있습니다.");
+            return current + 2;
+          }
+          return current;
+        });
+      }, 700);
+
       const response = await fetch("/api/brief", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -287,6 +354,10 @@ export default function Home() {
           elevenLabsModelId,
         }),
       });
+      window.clearInterval(progressTimer);
+      progressTimer = undefined;
+      setBriefingProgress(94);
+      setBriefingProgressLabel("브리핑 결과를 정리하고 있습니다.");
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -297,8 +368,15 @@ export default function Home() {
       setResult(body.briefing);
       setAudio(body.audio);
       setWarnings((previous) => [...previous, ...body.warnings]);
+      setBriefingProgress(100);
+      setBriefingProgressLabel("브리핑 생성이 완료되었습니다.");
       setState("done");
     } catch (reason) {
+      if (progressTimer) {
+        window.clearInterval(progressTimer);
+      }
+      setBriefingProgress(0);
+      setBriefingProgressLabel("");
       setError(reason instanceof Error ? reason.message : "브리핑 생성에 실패했습니다.");
       setState("error");
     }
@@ -360,19 +438,28 @@ export default function Home() {
     const html = makeEmbeddedHtml();
     if (!html) return;
 
-    const response = await fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ html }),
-    });
-
-    if (!response.ok) {
+    if (!user || !result) {
       setError("공유 페이지를 만들지 못했습니다.");
       return;
     }
 
-    const body = (await response.json()) as { path: string };
-    setShareUrl(new URL(body.path, window.location.origin).toString());
+    try {
+      const shared = await createFirebaseShare({
+        user,
+        html,
+        title: result.title,
+        sourceFilename: filename,
+        language: briefingLanguage,
+        speechProvider,
+      });
+      setShareUrl(new URL(`/s/${shared.id}`, window.location.origin).toString());
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? `공유 페이지를 만들지 못했습니다: ${reason.message}`
+          : "공유 페이지를 만들지 못했습니다.",
+      );
+    }
   }
 
   async function copyShareLink() {
@@ -480,6 +567,14 @@ export default function Home() {
                 <option value="work">업무보고</option>
                 <option value="study">학습용</option>
                 <option value="news">뉴스형</option>
+                <option value="family-letter">가정통신문</option>
+                <option value="parent-notice">학부모 안내</option>
+                <option value="civil-service">민원 답변</option>
+                <option value="executive-report">보고용 요약</option>
+                <option value="training">연수 안내</option>
+                <option value="meeting">회의 브리핑</option>
+                <option value="easy">쉬운 말 설명</option>
+                <option value="multicultural">다문화 가정 안내</option>
               </select>
             </div>
           </div>
@@ -613,6 +708,17 @@ export default function Home() {
                 : "ElevenLabs API key와 Voice ID를 입력해야 음성 브리핑을 만들 수 있습니다."}
             </div>
           ) : null}
+          {state === "briefing" ? (
+            <div className="progress-card" aria-live="polite">
+              <div className="progress-meta">
+                <span>{briefingProgressLabel}</span>
+                <strong>{briefingProgress}%</strong>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${briefingProgress}%` }} />
+              </div>
+            </div>
+          ) : null}
 
           <div className="actions">
             <button
@@ -716,8 +822,8 @@ export default function Home() {
                       {shareUrl}
                     </a>
                     <p>
-                      로컬 실행에서는 이 컴퓨터의 서버가 켜져 있을 때만 접근됩니다. 공개 배포는
-                      영속 저장소를 연결하세요.
+                      Firebase Storage에 저장된 공유 페이지입니다. 공개 URL이므로 배포 전
+                      개인정보 포함 여부를 확인하세요.
                     </p>
                     <button className="secondary" onClick={() => void copyShareLink()}>
                       <Copy size={16} />

@@ -653,6 +653,44 @@ audio {
   line-height: 1.45;
 }
 
+.progress-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #b8ded9;
+  border-radius: 8px;
+  background: #f0fdfa;
+}
+
+.progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #315b5c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.progress-meta strong {
+  color: var(--accent-strong);
+  font-size: 14px;
+}
+
+.progress-track {
+  height: 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #d7efeb;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 360ms ease;
+}
+
 @media (max-width: 980px) {
   .workspace,
   .result-grid,

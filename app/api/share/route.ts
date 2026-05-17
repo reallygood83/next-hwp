@@ -1,5 +1,3 @@
-import { saveSharedHtml } from "@/lib/share-store";
-
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
@@ -13,8 +11,10 @@ export async function POST(request: Request) {
       return Response.json({ error: "html is too large to share." }, { status: 413 });
     }
 
-    const id = await saveSharedHtml(body.html);
-    return Response.json({ id, path: `/s/${id}` });
+    return Response.json(
+      { error: "Firebase client sharing is required. Use the signed-in app UI." },
+      { status: 410 },
+    );
   } catch {
     return Response.json({ error: "Failed to create share page." }, { status: 500 });
   }

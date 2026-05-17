@@ -68,12 +68,7 @@ function buildPrompt(request: BriefingRequest) {
       : request.duration === "deep"
         ? "about 5 minutes"
         : "about 3 minutes";
-  const styleLabel =
-    request.style === "work"
-      ? "work briefing"
-      : request.style === "study"
-        ? "study note"
-        : "news briefing";
+  const styleInstruction = briefingStyleInstruction(request.style);
   const languageLabel = languageName(request.briefingLanguage || "ko");
 
   return [
@@ -84,17 +79,82 @@ function buildPrompt(request: BriefingRequest) {
     "htmlBody must be a safe fragment using only p, h2, ul, li, strong tags.",
     `Filename: ${request.filename}`,
     `Target length: ${durationLabel}`,
-    `Style: ${styleLabel}`,
+    `Style instruction: ${styleInstruction}`,
     "Source text:",
     request.text.slice(0, 42000),
   ].join("\n\n");
 }
 
+function briefingStyleInstruction(style: BriefingRequest["style"]) {
+  const instructions: Record<BriefingRequest["style"], string> = {
+    work: "work briefing for an internal staff update; concise, factual, action-oriented",
+    study: "study note for learners; explain terms clearly and include learning checkpoints",
+    news: "news-style briefing; lead with what happened, why it matters, and what follows",
+    "family-letter":
+      "school family letter; warm, polite, parent-friendly, with dates, required actions, and contact guidance",
+    "parent-notice":
+      "parent notice; simple language, clear preparation items, deadlines, and student/parent actions",
+    "civil-service":
+      "civil complaint response; respectful, neutral, procedural, and careful not to overpromise",
+    "executive-report":
+      "executive report; summarize issue, evidence, decision points, risks, and recommended action",
+    training:
+      "training guide; explain purpose, schedule, participation method, and expected outcomes",
+    meeting:
+      "meeting briefing; agenda-first, discussion points, decisions needed, and follow-up tasks",
+    easy: "plain-language briefing; short sentences, no jargon, explain administrative terms",
+    multicultural:
+      "multicultural family guidance; culturally sensitive, easy to understand, practical, and parent-friendly",
+  };
+  return instructions[style];
+}
+
 function languageName(language: NonNullable<BriefingRequest["briefingLanguage"]>) {
-  if (language === "en") return "English";
-  if (language === "ja") return "Japanese";
-  if (language === "zh") return "Chinese";
-  return "Korean";
+  const names: Record<string, string> = {
+    ko: "Korean",
+    en: "English",
+    ja: "Japanese",
+    zh: "Chinese",
+    vi: "Vietnamese",
+    ru: "Russian",
+    mn: "Mongolian",
+    th: "Thai",
+    id: "Indonesian",
+    tl: "Tagalog",
+    km: "Khmer",
+    my: "Burmese",
+    lo: "Lao",
+    ms: "Malay",
+    hi: "Hindi",
+    bn: "Bengali",
+    ur: "Urdu",
+    ne: "Nepali",
+    ta: "Tamil",
+    te: "Telugu",
+    ar: "Arabic",
+    fa: "Persian",
+    tr: "Turkish",
+    he: "Hebrew",
+    fr: "French",
+    es: "Spanish",
+    de: "German",
+    it: "Italian",
+    pt: "Portuguese",
+    nl: "Dutch",
+    pl: "Polish",
+    uk: "Ukrainian",
+    cs: "Czech",
+    sk: "Slovak",
+    hu: "Hungarian",
+    ro: "Romanian",
+    bg: "Bulgarian",
+    el: "Greek",
+    sv: "Swedish",
+    da: "Danish",
+    fi: "Finnish",
+    no: "Norwegian",
+  };
+  return names[language] || language;
 }
 
 function normalizeBriefing(value: Partial<BriefingResult>): BriefingResult {
