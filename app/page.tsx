@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import {
   AlertTriangle,
   Download,
@@ -121,7 +122,7 @@ function LandingPage({
   return (
     <main className="landing">
       <nav className="landing-nav">
-        <div className="brand">
+        <Link className="brand brand-link" href="/">
           <span className="brand-mark">
             <FileAudio size={18} aria-hidden="true" />
           </span>
@@ -129,7 +130,7 @@ function LandingPage({
             <span className="brand-title">한글소리 AI</span>
             <span className="brand-subtitle">HwpVoice</span>
           </span>
-        </div>
+        </Link>
         <div className="nav-actions">
           <a className="secondary compact-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
             <Download size={16} />
@@ -537,7 +538,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand">
+        <Link className="brand brand-link" href="/">
           <span className="brand-mark">
             <FileAudio size={18} aria-hidden="true" />
           </span>
@@ -545,7 +546,7 @@ export default function Home() {
             <span className="brand-title">한글소리 AI</span>
             <span className="brand-subtitle">HwpVoice</span>
           </span>
-        </div>
+        </Link>
         <div className="topbar-actions">
           <span className="status-pill">
             <Sparkles size={15} aria-hidden="true" />
@@ -882,6 +883,13 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      <footer className="app-footer">
+        <span>2026 Copyright 배움의 달인</span>
+        <a className="secondary compact-button nav-link" href={youtubeUrl} target="_blank" rel="noreferrer">
+          배움의 달인 유튜브 바로가기
+        </a>
+      </footer>
     </main>
   );
 }

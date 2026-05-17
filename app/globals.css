@@ -66,6 +66,14 @@ a {
   font-weight: 800;
 }
 
+.brand-link {
+  color: inherit;
+}
+
+.brand-link:hover .brand-title {
+  color: var(--accent-strong);
+}
+
 .brand-text {
   display: grid;
   gap: 1px;
@@ -289,6 +297,20 @@ a {
   min-height: 72px;
   margin: 0 auto;
   padding: 18px 0 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-footer {
+  width: min(1420px, calc(100% - 44px));
+  min-height: 68px;
+  margin: 0 auto;
+  padding: 8px 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -762,7 +784,8 @@ audio {
     padding: 38px 34px;
   }
 
-  .landing-footer {
+  .landing-footer,
+  .app-footer {
     align-items: flex-start;
     flex-direction: column;
   }
