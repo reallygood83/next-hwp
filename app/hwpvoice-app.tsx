@@ -1369,15 +1369,9 @@ function RhwpStudioViewer({
       if (cancelled || !frameRef.current?.contentWindow) return;
       attempts += 1;
       if (initialBlank) {
-        frameRef.current.contentWindow.postMessage(
-          {
-            type: "rhwp-request",
-            id: `blank-${Date.now()}`,
-            method: "createNewDocument",
-            params: {},
-          },
-          window.location.origin,
-        );
+        triggerBlankDocument(frameRef.current);
+        setMessage("새 한글 문서를 열었습니다");
+        cancelled = true;
       } else if (buffer) {
         frameRef.current.contentWindow.postMessage(
           {
@@ -1579,6 +1573,20 @@ function requestRhwp<T>(
       window.location.origin,
     );
   });
+}
+
+function triggerBlankDocument(frame: HTMLIFrameElement) {
+  const targetWindow = frame.contentWindow;
+  const targetDocument = targetWindow?.document;
+  if (!targetWindow || !targetDocument) return;
+  const event = new KeyboardEvent("keydown", {
+    key: "n",
+    code: "KeyN",
+    altKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  targetDocument.dispatchEvent(event);
 }
 
 async function svgToPngDataUrl(svg: string) {
