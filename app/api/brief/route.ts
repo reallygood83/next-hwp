@@ -95,14 +95,14 @@ function validateSpeechCredentials(
   credentials: BriefingRequestCredentials,
   provider: NonNullable<BriefingRequest["speechProvider"]>,
 ) {
+  if (!credentials.geminiApiKey) {
+    return "Gemini API key is required to create the briefing script.";
+  }
   if (provider === "elevenlabs") {
     if (!credentials.elevenLabsApiKey || !body.elevenLabsVoiceId?.trim()) {
       return "ElevenLabs API key and Voice ID are required.";
     }
     return null;
-  }
-  if (!credentials.geminiApiKey) {
-    return "Gemini API key is required.";
   }
   return null;
 }

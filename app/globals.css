@@ -417,6 +417,21 @@ a {
   background: #f0fdfa;
 }
 
+.voice-box-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #315b5c;
+  font-size: 13px;
+}
+
+.voice-box-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .security-note {
   margin: 0;
   color: #315b5c;

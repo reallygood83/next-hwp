@@ -257,9 +257,9 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
     return `data:${audio.mimeType};base64,${audio.base64}`;
   }, [audio]);
   const isMissingSpeechCredential =
-    speechProvider === "gemini"
-      ? !geminiApiKey.trim()
-      : !elevenLabsApiKey.trim() || !elevenLabsVoiceId.trim();
+    !geminiApiKey.trim() ||
+    (speechProvider === "elevenlabs" &&
+      (!elevenLabsApiKey.trim() || !elevenLabsVoiceId.trim()));
 
   useEffect(() => {
     void getFirebaseAnalytics();
@@ -669,18 +669,33 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
             </select>
           </div>
 
+          <div className="voice-box">
+            <div className="voice-box-title">
+              <strong>대본 생성</strong>
+              <span>Gemini</span>
+            </div>
+            <div className="field">
+              <label htmlFor="geminiApiKey">Gemini API key</label>
+              <input
+                id="geminiApiKey"
+                type="password"
+                autoComplete="off"
+                value={geminiApiKey}
+                onChange={(event) => setGeminiApiKey(event.target.value)}
+                placeholder="Gemini API key를 입력하세요."
+              />
+            </div>
+            <p className="security-note">
+              Gemini는 원문을 요약하고 브리핑 대본과 HTML 본문을 만듭니다. API key는 저장하지
+              않고 이번 요청에만 서버로 전송합니다.
+            </p>
+          </div>
+
           {speechProvider === "gemini" ? (
             <div className="voice-box">
-              <div className="field">
-                <label htmlFor="geminiApiKey">Gemini API key</label>
-                <input
-                  id="geminiApiKey"
-                  type="password"
-                  autoComplete="off"
-                  value={geminiApiKey}
-                  onChange={(event) => setGeminiApiKey(event.target.value)}
-                  placeholder="Gemini API key를 입력하세요."
-                />
+              <div className="voice-box-title">
+                <strong>음성 생성</strong>
+                <span>Gemini TTS</span>
               </div>
               <div className="field">
                 <label htmlFor="geminiTtsModel">TTS 모델</label>
@@ -711,12 +726,16 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
                 </select>
               </div>
               <p className="security-note">
-                API key는 저장하지 않고 이번 요청에만 서버로 전송합니다. 공유 HTML, ZIP,
-                링크에는 포함하지 않습니다.
+                Gemini TTS는 Gemini가 만든 대본을 바로 음성으로 합성합니다. 공유 HTML, ZIP,
+                링크에는 API key를 포함하지 않습니다.
               </p>
             </div>
           ) : (
             <div className="voice-box">
+              <div className="voice-box-title">
+                <strong>음성 생성</strong>
+                <span>ElevenLabs</span>
+              </div>
               <div className="field">
                 <label htmlFor="elevenLabsApiKey">ElevenLabs API key</label>
                 <input
@@ -752,7 +771,8 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
                 </select>
               </div>
               <p className="security-note">
-                ElevenLabs 키와 Voice ID는 서버에 저장하지 않고 음성 생성 요청에만 사용합니다.
+                ElevenLabs는 Gemini가 만든 대본을 음성으로 합성합니다. ElevenLabs 키와 Voice ID는
+                서버에 저장하지 않고 음성 생성 요청에만 사용합니다.
               </p>
             </div>
           )}
@@ -766,8 +786,8 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
           {isMissingSpeechCredential ? (
             <div className="error">
               <AlertTriangle size={15} aria-hidden="true" />
-              {speechProvider === "gemini"
-                ? "Gemini API key를 입력해야 음성 브리핑을 만들 수 있습니다."
+              {!geminiApiKey.trim()
+                ? "Gemini API key를 입력해야 브리핑 대본을 만들 수 있습니다."
                 : "ElevenLabs API key와 Voice ID를 입력해야 음성 브리핑을 만들 수 있습니다."}
             </div>
           ) : null}
