@@ -316,6 +316,11 @@ button {
   line-height: 1.9;
 }
 
+.doc-page.unsupported {
+  border-style: dashed;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+
 .compact .doc-page {
   min-height: 360px;
   max-height: 520px;
@@ -337,6 +342,78 @@ button {
   align-content: center;
   text-align: center;
   color: var(--muted);
+}
+
+.doc-empty h1 {
+  margin: 12px 0 6px;
+  color: #344054;
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.doc-empty p {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.unsupported-state {
+  color: #7c2d12;
+}
+
+.unsupported-state h1 {
+  color: #7c2d12;
+}
+
+.unsupported-actions {
+  width: min(100%, 460px);
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  text-align: left;
+}
+
+.unsupported-actions span {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 800;
+}
+
+.unsupported-actions ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.viewer-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.share-box {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #b8ded9;
+  border-radius: 8px;
+  background: #f0fdfa;
+  overflow: hidden;
+}
+
+.share-box a {
+  color: var(--accent-strong);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.share-box p {
+  margin: 0;
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 audio {

@@ -12,6 +12,7 @@ export async function extractTextFromFile(file: File): Promise<ExtractionResult>
     return {
       text,
       html: textToPreviewHtml(text),
+      status: text.trim() ? "ready" : "empty",
       warnings: [],
     };
   }
@@ -24,8 +25,9 @@ export async function extractTextFromFile(file: File): Promise<ExtractionResult>
     return {
       text: "",
       html: "",
+      status: "unsupported",
       warnings: [
-        "HWP binary extraction is not implemented in this web MVP. Paste extracted text or use an HWPX file.",
+        "이 MVP는 아직 HWP 바이너리 렌더링 bridge가 없습니다. HWPX로 변환하거나 본문을 붙여넣어 브리핑을 만들 수 있습니다.",
       ],
     };
   }
@@ -33,6 +35,7 @@ export async function extractTextFromFile(file: File): Promise<ExtractionResult>
   return {
     text: "",
     html: "",
+    status: "unsupported",
     warnings: ["Only HWPX, TXT, and Markdown files can be extracted in this MVP."],
   };
 }
@@ -47,6 +50,7 @@ async function extractTextFromHwpx(buffer: ArrayBuffer): Promise<ExtractionResul
     return {
       text: "",
       html: "",
+      status: "empty",
       warnings: ["No HWPX section XML files were found."],
     };
   }
@@ -62,6 +66,7 @@ async function extractTextFromHwpx(buffer: ArrayBuffer): Promise<ExtractionResul
   return {
     text: normalizeWhitespace(paragraphs.join("\n\n")),
     html: paragraphsToPreviewHtml(paragraphs),
+    status: paragraphs.length > 0 ? "ready" : "empty",
     warnings: [],
   };
 }

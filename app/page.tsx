@@ -3,12 +3,14 @@
 import {
   AlertTriangle,
   Download,
+  Copy,
   FileAudio,
   FileText,
   FileType,
   Loader2,
   Mic,
   Package,
+  Share2,
   Sparkles,
   Upload,
 } from "lucide-react";
@@ -34,6 +36,9 @@ export default function Home() {
   const [filename, setFilename] = useState("sample.txt");
   const [text, setText] = useState(sampleText);
   const [documentHtml, setDocumentHtml] = useState(sampleHtml);
+  const [documentStatus, setDocumentStatus] = useState<"ready" | "unsupported" | "empty">(
+    "ready",
+  );
   const [duration, setDuration] = useState<BriefingDuration>("standard");
   const [style, setStyle] = useState<BriefingStyle>("work");
   const [voiceId, setVoiceId] = useState("");
@@ -42,6 +47,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<BriefingResult | null>(null);
   const [audio, setAudio] = useState<BriefingResponse["audio"]>();
+  const [shareUrl, setShareUrl] = useState("");
 
   const audioUrl = useMemo(() => {
     if (!audio) return "";
@@ -59,6 +65,7 @@ export default function Home() {
       const extracted = await extractTextFromFile(file);
       setText(extracted.text);
       setDocumentHtml(extracted.html || textToPreviewHtml(extracted.text));
+      setDocumentStatus(extracted.status || (extracted.text.trim() ? "ready" : "empty"));
       setWarnings(extracted.warnings);
       setState("idle");
     } catch {
@@ -72,6 +79,7 @@ export default function Home() {
     setError("");
     setResult(null);
     setAudio(undefined);
+    setShareUrl("");
 
     try {
       const response = await fetch("/api/brief", {
@@ -143,6 +151,39 @@ export default function Home() {
       }),
       "text/html;charset=utf-8",
     );
+  }
+
+  function makeEmbeddedHtml() {
+    if (!result) return "";
+    return buildBriefingHtml(result, {
+      audioFilename: safeBaseName(filename) + "-briefing.mp3",
+      embeddedAudio: audio,
+      sourceHtml: documentHtml,
+    });
+  }
+
+  async function createShareLink() {
+    const html = makeEmbeddedHtml();
+    if (!html) return;
+
+    const response = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ html }),
+    });
+
+    if (!response.ok) {
+      setError("공유 페이지를 만들지 못했습니다.");
+      return;
+    }
+
+    const body = (await response.json()) as { path: string };
+    setShareUrl(new URL(body.path, window.location.origin).toString());
+  }
+
+  async function copyShareLink() {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
   }
 
   async function downloadPackage() {
@@ -254,7 +295,7 @@ export default function Home() {
           <div className="actions">
             <button
               className="primary"
-              disabled={isBusy || text.trim().length < 20}
+              disabled={isBusy || text.trim().length < 20 || documentStatus === "unsupported"}
               onClick={() => void createBriefing()}
             >
               {isBusy ? <Loader2 size={17} aria-hidden="true" /> : <FileAudio size={17} />}
@@ -269,6 +310,7 @@ export default function Home() {
               onClick={() => {
                 setText(sampleText);
                 setDocumentHtml(sampleHtml);
+                setDocumentStatus("ready");
                 setFilename("sample.txt");
               }}
             >
@@ -280,7 +322,12 @@ export default function Home() {
 
         <section className="panel result" aria-label="브리핑 결과">
           {!result ? (
-            <DocumentPreview filename={filename} html={documentHtml} text={text} />
+            <DocumentPreview
+              filename={filename}
+              html={documentHtml}
+              text={text}
+              status={documentStatus}
+            />
           ) : (
             <div className="result-grid">
               <article>
@@ -295,7 +342,13 @@ export default function Home() {
                 <h2>브리핑 대본</h2>
                 <div className="script">{result.briefingScript}</div>
                 <h2>원문 보기</h2>
-                <DocumentPreview filename={filename} html={documentHtml} text={text} compact />
+                <DocumentPreview
+                  filename={filename}
+                  html={documentHtml}
+                  text={text}
+                  status={documentStatus}
+                  compact
+                />
               </article>
 
               <aside className="side-card">
@@ -323,6 +376,25 @@ export default function Home() {
                   <Package size={17} />
                   HTML+MP3 zip
                 </button>
+                <button className="secondary" onClick={() => void createShareLink()}>
+                  <Share2 size={17} />
+                  링크 생성
+                </button>
+                {shareUrl ? (
+                  <div className="share-box">
+                    <a href={shareUrl} target="_blank" rel="noreferrer">
+                      {shareUrl}
+                    </a>
+                    <p>
+                      로컬 실행에서는 이 컴퓨터의 서버가 켜져 있을 때만 접근됩니다. 공개 배포는
+                      영속 저장소를 연결하세요.
+                    </p>
+                    <button className="secondary" onClick={() => void copyShareLink()}>
+                      <Copy size={16} />
+                      복사
+                    </button>
+                  </div>
+                ) : null}
               </aside>
             </div>
           )}
@@ -336,14 +408,18 @@ function DocumentPreview({
   filename,
   html,
   text,
+  status,
   compact = false,
 }: {
   filename: string;
   html: string;
   text: string;
+  status: "ready" | "unsupported" | "empty";
   compact?: boolean;
 }) {
   const bodyHtml = html || textToPreviewHtml(text);
+  const isUnsupported = status === "unsupported";
+  const isEmpty = status === "empty" || (!bodyHtml && !isUnsupported);
 
   return (
     <div className={compact ? "doc-preview compact" : "doc-preview"}>
@@ -352,23 +428,48 @@ function DocumentPreview({
           <FileText size={16} aria-hidden="true" />
           {filename}
         </span>
-        <span>{text.trim().length.toLocaleString()}자</span>
+        <span>
+          {isUnsupported
+            ? "HWP 렌더링 준비 중"
+            : `${text.trim().length.toLocaleString()}자`}
+        </span>
       </div>
-      <div className="doc-page">
-        {bodyHtml ? (
+      <div className={isUnsupported ? "doc-page unsupported" : "doc-page"}>
+        {isUnsupported ? (
+          <div className="doc-empty unsupported-state">
+            <AlertTriangle size={38} aria-hidden="true" />
+            <h1>HWP 원문 렌더링은 아직 준비 중입니다</h1>
+            <p>
+              현재 웹 MVP는 HWPX, TXT, Markdown의 본문 보기와 브리핑을 지원합니다.
+              이 HWP 파일을 바로 보려면 rhwp/WASM bridge 또는 서버-side 변환기가 필요합니다.
+            </p>
+            <div className="unsupported-actions">
+              <span>가능한 진행</span>
+              <ul>
+                <li>한글에서 HWPX로 저장한 뒤 업로드</li>
+                <li>본문을 왼쪽 텍스트 영역에 붙여넣기</li>
+                <li>다음 단계에서 HWP parser bridge 연결</li>
+              </ul>
+            </div>
+          </div>
+        ) : bodyHtml ? (
           <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
-        ) : (
+        ) : isEmpty ? (
           <div className="doc-empty">
             <FileAudio size={34} aria-hidden="true" />
-            <h1>문서를 들을 수 있는 브리핑으로 변환</h1>
+            <h1>문서 본문을 기다리고 있습니다</h1>
             <p>HWPX 파일을 올리거나 본문을 붙여넣으면 문서 보기와 브리핑을 함께 만듭니다.</p>
           </div>
-        )}
+        ) : null}
       </div>
+      {isUnsupported ? (
+        <p className="viewer-note">
+          이 상태에서는 원문 텍스트가 없어서 AI 브리핑 버튼을 비활성화합니다.
+        </p>
+      ) : null}
     </div>
   );
 }
-
 function safeBaseName(filename: string) {
   return filename
     .replace(/\.[^.]+$/, "")

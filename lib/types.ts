@@ -31,5 +31,6 @@ export type BriefingResponse = {
 export type ExtractionResult = {
   text: string;
   html: string;
+  status?: "ready" | "unsupported" | "empty";
   warnings: string[];
 };
