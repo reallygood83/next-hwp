@@ -348,6 +348,20 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
     }
   }
 
+  function startBlankHwpDocument() {
+    setFilename("새 문서.hwp");
+    setText("");
+    setDocumentHtml("");
+    setDocumentBuffer(null);
+    setDocumentKind("hwp");
+    setDocumentStatus("ready");
+    setWarnings([]);
+    setError("");
+    setResult(null);
+    setAudio(undefined);
+    setShareUrl("");
+  }
+
   async function applyEditedHwp(bytes: Uint8Array) {
     const editedName = safeBaseName(filename) + "-edited.hwp";
     const buffer = toArrayBuffer(bytes);
@@ -1087,6 +1101,9 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
                 setDocumentKind("text");
                 setDocumentStatus("ready");
                 setFilename("sample.txt");
+                setResult(null);
+                setAudio(undefined);
+                setShareUrl("");
               }}
             >
               <FileText size={17} />
@@ -1104,6 +1121,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
               kind={documentKind}
               onApplyEditedHwp={(bytes) => void applyEditedHwp(bytes)}
               onDownloadEditedHwp={downloadEditedHwp}
+              onCreateBlankHwp={startBlankHwpDocument}
               text={text}
               status={documentStatus}
             />
@@ -1233,6 +1251,7 @@ function DocumentPreview({
   kind = "text",
   onApplyEditedHwp,
   onDownloadEditedHwp,
+  onCreateBlankHwp,
   text,
   status,
   compact = false,
@@ -1243,6 +1262,7 @@ function DocumentPreview({
   kind?: "hwp" | "hwpx" | "text";
   onApplyEditedHwp?: (bytes: Uint8Array) => void;
   onDownloadEditedHwp?: (bytes: Uint8Array) => void;
+  onCreateBlankHwp?: () => void;
   text: string;
   status: "ready" | "unsupported" | "empty";
   compact?: boolean;
@@ -1258,16 +1278,24 @@ function DocumentPreview({
           <FileText size={16} aria-hidden="true" />
           {filename}
         </span>
-        <span>
-          {isUnsupported
-            ? "표시 불가"
-            : `${text.trim().length.toLocaleString()}자`}
-        </span>
+        <div className="doc-preview-toolbar-actions">
+          {onCreateBlankHwp && !compact ? (
+            <button type="button" onClick={onCreateBlankHwp}>
+              새 한글 문서
+            </button>
+          ) : null}
+          <span>
+            {isUnsupported
+              ? "표시 불가"
+              : `${text.trim().length.toLocaleString()}자`}
+          </span>
+        </div>
       </div>
-      {buffer && (kind === "hwp" || kind === "hwpx") && !compact ? (
+      {((buffer && (kind === "hwp" || kind === "hwpx")) || (!buffer && kind === "hwp" && !text.trim())) && !compact ? (
         <RhwpStudioViewer
           buffer={buffer}
           filename={filename}
+          initialBlank={!buffer && kind === "hwp"}
           onApplyEditedHwp={onApplyEditedHwp}
           onDownloadEditedHwp={onDownloadEditedHwp}
         />
@@ -1295,8 +1323,14 @@ function DocumentPreview({
           ) : isEmpty ? (
             <div className="doc-empty">
               <FileAudio size={34} aria-hidden="true" />
-              <h1>문서 본문을 기다리고 있습니다</h1>
-              <p>HWPX 파일을 올리거나 본문을 붙여넣으면 문서 보기와 브리핑을 함께 만듭니다.</p>
+              <h1>새 문서를 만들 수 있습니다</h1>
+              <p>한글 문서를 직접 작성한 뒤 편집본을 브리핑 입력으로 가져올 수 있습니다.</p>
+              {onCreateBlankHwp ? (
+                <button className="secondary doc-empty-action" type="button" onClick={onCreateBlankHwp}>
+                  <FileText size={17} />
+                  새 한글 문서
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -1313,11 +1347,13 @@ function DocumentPreview({
 function RhwpStudioViewer({
   buffer,
   filename,
+  initialBlank = false,
   onApplyEditedHwp,
   onDownloadEditedHwp,
 }: {
-  buffer: ArrayBuffer;
+  buffer?: ArrayBuffer | null;
   filename: string;
+  initialBlank?: boolean;
   onApplyEditedHwp?: (bytes: Uint8Array) => void;
   onDownloadEditedHwp?: (bytes: Uint8Array) => void;
 }) {
@@ -1332,14 +1368,26 @@ function RhwpStudioViewer({
     const send = () => {
       if (cancelled || !frameRef.current?.contentWindow) return;
       attempts += 1;
-      frameRef.current.contentWindow.postMessage(
-        {
-          type: "hwpctl-load",
-          fileName: filename,
-          data: buffer.slice(0),
-        },
-        window.location.origin,
-      );
+      if (initialBlank) {
+        frameRef.current.contentWindow.postMessage(
+          {
+            type: "rhwp-request",
+            id: `blank-${Date.now()}`,
+            method: "createNewDocument",
+            params: {},
+          },
+          window.location.origin,
+        );
+      } else if (buffer) {
+        frameRef.current.contentWindow.postMessage(
+          {
+            type: "hwpctl-load",
+            fileName: filename,
+            data: buffer.slice(0),
+          },
+          window.location.origin,
+        );
+      }
       if (attempts < 8) {
         window.setTimeout(send, 450);
       }
@@ -1380,7 +1428,7 @@ function RhwpStudioViewer({
       window.clearTimeout(timer);
       window.removeEventListener("message", receive);
     };
-  }, [buffer, filename, onApplyEditedHwp, onDownloadEditedHwp]);
+  }, [buffer, filename, initialBlank, onApplyEditedHwp, onDownloadEditedHwp]);
 
   function requestExport(mode: "apply" | "download") {
     exportModeRef.current = mode;

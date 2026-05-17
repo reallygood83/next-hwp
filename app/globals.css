@@ -764,6 +764,25 @@ a {
   min-width: 0;
 }
 
+.doc-preview-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.doc-preview-toolbar-actions button,
+.doc-empty-action {
+  min-height: 30px;
+  border: 1px solid #b8ded9;
+  border-radius: 7px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .doc-page {
   width: min(100%, 760px);
   min-height: 820px;
@@ -866,6 +885,14 @@ a {
 .doc-empty p {
   max-width: 520px;
   margin: 0 auto;
+}
+
+.doc-empty-action {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
 
 .unsupported-state {
