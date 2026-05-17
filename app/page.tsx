@@ -407,6 +407,7 @@ export default function Home() {
       buildBriefingHtml(result, {
         audioFilename: safeBaseName(filename) + "-briefing." + audioExtension(audio?.mimeType),
         sourceHtml: documentHtml,
+        originalDocument: originalDocumentPayload(),
       }),
       "text/html;charset=utf-8",
     );
@@ -420,6 +421,7 @@ export default function Home() {
         audioFilename: safeBaseName(filename) + "-briefing." + audioExtension(audio?.mimeType),
         embeddedAudio: audio,
         sourceHtml: documentHtml,
+        originalDocument: originalDocumentPayload(),
       }),
       "text/html;charset=utf-8",
     );
@@ -431,6 +433,7 @@ export default function Home() {
       audioFilename: safeBaseName(filename) + "-briefing." + audioExtension(audio?.mimeType),
       embeddedAudio: audio,
       sourceHtml: documentHtml,
+      originalDocument: originalDocumentPayload(),
     });
   }
 
@@ -473,6 +476,7 @@ export default function Home() {
     const html = buildBriefingHtml(result, {
       audioFilename: `${baseName}-briefing.${audioExtension(audio?.mimeType)}`,
       sourceHtml: documentHtml,
+      originalDocument: originalDocumentPayload(),
     });
     const zip = new JSZip();
     zip.file(`${baseName}-briefing.html`, html);
@@ -483,6 +487,14 @@ export default function Home() {
     }
     const blob = await zip.generateAsync({ type: "blob" });
     downloadBlob(`${baseName}-briefing-package.zip`, blob);
+  }
+
+  function originalDocumentPayload() {
+    if (!documentBuffer || (documentKind !== "hwp" && documentKind !== "hwpx")) return undefined;
+    return {
+      filename,
+      base64: arrayBufferToBase64(documentBuffer),
+    };
   }
 
   const isBusy = state === "extracting" || state === "briefing";
@@ -1053,6 +1065,17 @@ function toArrayBuffer(bytes: Uint8Array) {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
   return buffer;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
 }
 
 function textToPreviewHtml(value: string) {
