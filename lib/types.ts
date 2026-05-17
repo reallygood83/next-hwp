@@ -24,10 +24,8 @@ export type BriefingRequest = {
   style: BriefingStyle;
   briefingLanguage?: BriefingLanguage;
   speechProvider?: SpeechProvider;
-  geminiApiKey?: string;
   geminiTtsModel?: string;
   geminiVoiceName?: string;
-  elevenLabsApiKey?: string;
   elevenLabsVoiceId?: string;
   elevenLabsModelId?: string;
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   AlertTriangle,
   Download,
@@ -9,7 +10,6 @@ import {
   FileType,
   Loader2,
   Lock,
-  Mic,
   Package,
   Share2,
   Sparkles,
@@ -42,11 +42,12 @@ const sampleText =
   "이 문서는 한글 문서를 빠르게 이해하기 위한 AI 음성 브리핑 기능 제안서입니다. 사용자는 HWP 또는 HWPX 문서를 열고 핵심 요약, 브리핑 대본, HTML 공유 파일, MP3 음성 파일을 생성할 수 있습니다. Gemini API는 구조화된 요약을 만들고 ElevenLabs API는 자연스러운 한국어 음성을 생성합니다. API 키는 안전하게 관리해야 하며 문서 내용이 외부 API로 전송된다는 점을 명확히 고지해야 합니다.";
 
 const sampleHtml = textToPreviewHtml(sampleText);
+const githubUrl = "https://github.com/reallygood83/next-hwp";
 
 const geminiTtsModels = [
-  { value: "gemini-3.1-flash-tts-preview", label: "Gemini 3.1 Flash TTS Preview" },
   { value: "gemini-2.5-flash-preview-tts", label: "Gemini 2.5 Flash TTS Preview" },
   { value: "gemini-2.5-pro-preview-tts", label: "Gemini 2.5 Pro TTS Preview" },
+  { value: "gemini-3.1-flash-tts-preview", label: "Gemini 3.1 Flash TTS Preview" },
 ];
 
 const geminiVoices = [
@@ -121,14 +122,23 @@ function LandingPage({
       <nav className="landing-nav">
         <div className="brand">
           <span className="brand-mark">
-            <Mic size={18} aria-hidden="true" />
+            <FileAudio size={18} aria-hidden="true" />
           </span>
-          <span>Next HWP Briefing</span>
+          <span className="brand-text">
+            <span className="brand-title">한글소리 AI</span>
+            <span className="brand-subtitle">HwpVoice</span>
+          </span>
         </div>
-        <button className="secondary compact-button" disabled={!authReady} onClick={onSignIn}>
-          <Lock size={16} />
-          Google로 시작
-        </button>
+        <div className="nav-actions">
+          <a className="secondary compact-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
+            <Download size={16} />
+            다운로드
+          </a>
+          <button className="secondary compact-button" disabled={!authReady} onClick={onSignIn}>
+            <Lock size={16} />
+            Google로 시작
+          </button>
+        </div>
       </nav>
 
       <section className="landing-hero">
@@ -154,11 +164,18 @@ function LandingPage({
           {authError ? <div className="error">{authError}</div> : null}
         </div>
         <div className="landing-preview" aria-hidden="true">
-          <div className="preview-toolbar">HWP 문서 → AI 브리핑 → 공유 HTML</div>
-          <div className="preview-doc">
-            <strong>연수 계획 보고서</strong>
-            <p>핵심 일정, 대상, 예산, 유의사항을 음성 대본으로 요약합니다.</p>
-            <div className="preview-wave" />
+          <Image
+            src="/landing-briefing-hero_001.jpg"
+            alt=""
+            className="landing-preview-image"
+            width={1280}
+            height={720}
+            priority
+            sizes="(max-width: 900px) 100vw, 520px"
+          />
+          <div className="landing-preview-caption">
+            <strong>HWP 문서 → AI 브리핑 → 공유 HTML</strong>
+            <span>문서 검토, 음성 대본, 링크 배포를 한 화면에서 처리합니다.</span>
           </div>
         </div>
       </section>
@@ -210,7 +227,7 @@ export default function Home() {
   const [briefingLanguage, setBriefingLanguage] = useState<BriefingLanguage>("ko");
   const [speechProvider, setSpeechProvider] = useState<SpeechProvider>("gemini");
   const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [geminiTtsModel, setGeminiTtsModel] = useState("gemini-3.1-flash-tts-preview");
+  const [geminiTtsModel, setGeminiTtsModel] = useState("gemini-2.5-flash-preview-tts");
   const [geminiVoiceName, setGeminiVoiceName] = useState("Kore");
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
   const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState("");
@@ -514,17 +531,26 @@ export default function Home() {
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark">
-            <Mic size={18} aria-hidden="true" />
+            <FileAudio size={18} aria-hidden="true" />
           </span>
-          <span>Next HWP Briefing</span>
+          <span className="brand-text">
+            <span className="brand-title">한글소리 AI</span>
+            <span className="brand-subtitle">HwpVoice</span>
+          </span>
         </div>
-        <span className="status-pill">
-          <Sparkles size={15} aria-hidden="true" />
-          Gemini TTS 기본
-        </span>
-        <button className="account-button" onClick={() => void handleSignOut()}>
-          {user.displayName || user.email || "사용자"} 로그아웃
-        </button>
+        <div className="topbar-actions">
+          <span className="status-pill">
+            <Sparkles size={15} aria-hidden="true" />
+            Gemini 2.5 TTS 기본
+          </span>
+          <a className="account-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
+            <Download size={14} />
+            다운로드
+          </a>
+          <button className="account-button" onClick={() => void handleSignOut()}>
+            {user.displayName || user.email || "사용자"} 로그아웃
+          </button>
+        </div>
       </header>
 
       <div className="workspace">

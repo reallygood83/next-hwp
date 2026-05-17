@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
 export const DEFAULT_GEMINI_TTS_MODEL =
-  process.env.GEMINI_TTS_MODEL || "gemini-3.1-flash-tts-preview";
+  process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
 export const DEFAULT_GEMINI_TTS_VOICE = process.env.GEMINI_TTS_VOICE || "Kore";
 
 type GeminiSpeechOptions = {

@@ -18,8 +18,15 @@ const fallbackResult = (request: BriefingRequest): BriefingResult => {
   };
 };
 
-export async function createBriefing(request: BriefingRequest): Promise<BriefingResult> {
-  const apiKey = request.geminiApiKey?.trim() || process.env.GEMINI_API_KEY;
+type CreateBriefingOptions = {
+  apiKey?: string;
+};
+
+export async function createBriefing(
+  request: BriefingRequest,
+  options: CreateBriefingOptions = {},
+): Promise<BriefingResult> {
+  const apiKey = options.apiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return fallbackResult(request);
   }

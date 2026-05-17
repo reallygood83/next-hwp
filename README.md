@@ -1,6 +1,8 @@
-# next-hwp
+# 한글소리 AI / HwpVoice
 
 HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일로 바꾸는 Next.js MVP입니다.
+
+[GitHub](https://github.com/reallygood83/next-hwp) · [X @reallygood83](https://x.com/reallygood83) · [YouTube 배움의달인](https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v)
 
 ## 기능
 
@@ -41,7 +43,7 @@ firebase deploy --only firestore:rules,storage
 
 ```bash
 GEMINI_API_KEY=...
-GEMINI_TTS_MODEL=gemini-3.1-flash-tts-preview
+GEMINI_TTS_MODEL=gemini-2.5-flash-preview-tts
 GEMINI_TTS_VOICE=Kore
 ELEVENLABS_API_KEY=...
 ELEVENLABS_VOICE_ID=...
@@ -56,6 +58,10 @@ npm run build
 ```
 
 ## 설계 메모
+
+## Credits
+
+이 프로젝트는 macOS 한글 문서 경험을 개선하는 `alhangeul` 프로젝트와 `rhwp`/`rhwp-studio` 뷰어에서 참고와 영감을 얻었습니다. 현재 웹 MVP는 HWP/HWPX 원문 표시를 위해 bundled `rhwp-studio` WASM 뷰어를 사용합니다.
 
 HWP/HWPX 원문 보기는 `public/rhwp-studio/`에 포함된 `rhwp-studio` WASM 뷰어를 iframe으로 로드하고, 업로드한 파일 bytes를 `postMessage`로 전달합니다. 브리핑용 본문은 별도로 HWP OLE `BodyText/Section*` 또는 HWPX XML에서 추출합니다. 서버 API는 문서 원문과 API key를 로그에 남기지 않도록 작성되어 있습니다.
 

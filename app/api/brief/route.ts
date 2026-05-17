@@ -5,39 +5,63 @@ import type { BriefingRequest, BriefingResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
 
+type BriefingRequestCredentials = {
+  geminiApiKey?: string;
+  elevenLabsApiKey?: string;
+};
+
+type IncomingBriefingRequest = BriefingRequest & BriefingRequestCredentials;
+
+const noStoreHeaders = {
+  "Cache-Control": "no-store",
+};
+
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as BriefingRequest;
-    const validationError = validate(body);
+    const body = (await request.json()) as IncomingBriefingRequest;
+    const {
+      geminiApiKey: rawGeminiApiKey,
+      elevenLabsApiKey: rawElevenLabsApiKey,
+      ...briefingRequest
+    } = body;
+    const credentials = {
+      geminiApiKey: rawGeminiApiKey?.trim(),
+      elevenLabsApiKey: rawElevenLabsApiKey?.trim(),
+    };
+
+    const validationError = validate(briefingRequest);
     if (validationError) {
-      return Response.json({ error: validationError }, { status: 400 });
+      return Response.json({ error: validationError }, { status: 400, headers: noStoreHeaders });
     }
 
-    const briefing = await createBriefing(body);
     const warnings: string[] = [];
     let audio: BriefingResponse["audio"];
-    const provider = body.speechProvider || "gemini";
-    const credentialError = validateSpeechCredentials(body, provider);
+    const provider = briefingRequest.speechProvider || "gemini";
+    const credentialError = validateSpeechCredentials(briefingRequest, credentials, provider);
     if (credentialError) {
-      return Response.json({ error: credentialError }, { status: 400 });
+      return Response.json({ error: credentialError }, { status: 400, headers: noStoreHeaders });
     }
+
+    const briefing = await createBriefing(briefingRequest, {
+      apiKey: credentials.geminiApiKey,
+    });
 
     try {
       if (provider === "elevenlabs") {
         audio = await synthesizeElevenLabsSpeech(briefing.briefingScript, {
-          apiKey: body.elevenLabsApiKey,
-          voiceId: body.elevenLabsVoiceId,
-          modelId: body.elevenLabsModelId,
-          languageCode: body.briefingLanguage || "ko",
+          apiKey: credentials.elevenLabsApiKey,
+          voiceId: briefingRequest.elevenLabsVoiceId,
+          modelId: briefingRequest.elevenLabsModelId,
+          languageCode: briefingRequest.briefingLanguage || "ko",
         });
         if (!audio) {
           warnings.push("ElevenLabs API key or voice id is missing; audio was skipped.");
         }
       } else {
         audio = await synthesizeGeminiSpeech(briefing.briefingScript, {
-          apiKey: body.geminiApiKey,
-          model: body.geminiTtsModel,
-          voiceName: body.geminiVoiceName,
+          apiKey: credentials.geminiApiKey,
+          model: briefingRequest.geminiTtsModel,
+          voiceName: briefingRequest.geminiVoiceName,
         });
         if (!audio) {
           warnings.push("Gemini API key is missing; audio was skipped.");
@@ -57,23 +81,27 @@ export async function POST(request: Request) {
       warnings,
     };
 
-    return Response.json(response);
+    return Response.json(response, { headers: noStoreHeaders });
   } catch {
     return Response.json(
       { error: "Failed to create briefing. Check server environment variables." },
-      { status: 500 },
+      { status: 500, headers: noStoreHeaders },
     );
   }
 }
 
-function validateSpeechCredentials(body: BriefingRequest, provider: NonNullable<BriefingRequest["speechProvider"]>) {
+function validateSpeechCredentials(
+  body: BriefingRequest,
+  credentials: BriefingRequestCredentials,
+  provider: NonNullable<BriefingRequest["speechProvider"]>,
+) {
   if (provider === "elevenlabs") {
-    if (!body.elevenLabsApiKey?.trim() || !body.elevenLabsVoiceId?.trim()) {
+    if (!credentials.elevenLabsApiKey || !body.elevenLabsVoiceId?.trim()) {
       return "ElevenLabs API key and Voice ID are required.";
     }
     return null;
   }
-  if (!body.geminiApiKey?.trim()) {
+  if (!credentials.geminiApiKey) {
     return "Gemini API key is required.";
   }
   return null;
