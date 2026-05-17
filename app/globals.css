@@ -602,6 +602,37 @@ a {
   line-height: 1.45;
 }
 
+.share-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #b8ded9;
+  border-radius: 8px;
+  background: #f0fdfa;
+  color: #315b5c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.share-option input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.share-option span {
+  display: grid;
+  gap: 4px;
+}
+
+.share-option small {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .actions {
   display: flex;
   gap: 10px;

@@ -17,12 +17,24 @@ export async function GET(
     });
   }
 
+  const url = new URL(request.url);
+  if (url.searchParams.get("download") === "html") {
+    return new Response(renderSharePage(share, request.url), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${safeDownloadName(share.title)}.html"`,
+        "Cache-Control": "private, max-age=0, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
+
   return new Response(renderSharePage(share, request.url), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "public, max-age=3600",
       "Content-Security-Policy":
-        "default-src 'self'; img-src 'self' data:; media-src 'self' https://firebasestorage.googleapis.com; style-src 'unsafe-inline'; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+        "default-src 'self'; img-src 'self' data:; media-src 'self' https://firebasestorage.googleapis.com; frame-src 'self'; style-src 'unsafe-inline'; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
     },
@@ -39,6 +51,12 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
   imageUrl.searchParams.set("title", title);
   if (share.sourceFilename) imageUrl.searchParams.set("source", share.sourceFilename);
   const audioSrc = share.audioPath ? storageMediaUrl(share.audioPath) : "";
+  const htmlDownloadUrl = new URL(`/s/${share.id}`, url.origin);
+  htmlDownloadUrl.searchParams.set("download", "html");
+  const audioDownloadUrl = new URL(`/api/shares/${share.id}/audio`, url.origin);
+  const pdfViewUrl = new URL(`/api/shares/${share.id}/original-pdf`, url.origin);
+  const pdfDownloadUrl = new URL(`/api/shares/${share.id}/original-pdf`, url.origin);
+  pdfDownloadUrl.searchParams.set("download", "1");
   const keyPoints = share.keyPoints.map((point) => `<li>${escapeHtml(point)}</li>`).join("");
   const caveats =
     share.caveats.map((caveat) => `<li>${escapeHtml(caveat)}</li>`).join("") ||
@@ -76,10 +94,14 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
     .summary { margin: 0; max-width: 760px; color: #475467; font-size: 19px; line-height: 1.7; }
     .meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
     .pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border: 1px solid #b8ded9; border-radius: 999px; background: var(--soft); color: #315b5c; font-size: 13px; font-weight: 800; }
+    .share-actions { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid #b8ded9; border-radius: 8px; background: var(--soft); color: #245e57; font-weight: 900; text-decoration: none; }
     .content { padding: 28px; display: grid; gap: 24px; }
     audio { width: 100%; }
     .audio-card, section { border: 1px solid var(--line); border-radius: 10px; padding: 20px; background: #fff; }
     .audio-card { background: var(--soft); border-color: #b8ded9; }
+    .pdf-frame { width: 100%; min-height: 720px; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; }
+    .pdf-actions { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 10px; }
     h2 { margin: 0 0 12px; font-size: 22px; }
     p, li { line-height: 1.75; }
     ul { margin: 0; padding-left: 22px; }
@@ -104,6 +126,11 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
           <span class="pill">${escapeHtml(share.language || "ko")}</span>
           <span class="pill">${escapeHtml(share.speechProvider || "tts")}</span>
         </div>
+        <div class="share-actions">
+          <a class="button" href="${escapeAttribute(htmlDownloadUrl.toString())}">HTML 저장</a>
+          ${audioSrc ? `<a class="button" href="${escapeAttribute(audioDownloadUrl.toString())}">MP3 저장</a>` : ""}
+          ${share.originalPdfPath ? `<a class="button" href="${escapeAttribute(pdfDownloadUrl.toString())}">원문 PDF 저장</a>` : ""}
+        </div>
       </header>
       <div class="content">
         ${
@@ -119,6 +146,15 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
           <summary>브리핑 대본 펼치기</summary>
           <div class="script">${escapeHtml(share.briefingScript)}</div>
         </details>
+        ${
+          share.originalPdfPath
+            ? `<section>
+          <h2>원문 PDF</h2>
+          <iframe class="pdf-frame" title="원문 PDF" src="${escapeAttribute(pdfViewUrl.toString())}"></iframe>
+          <div class="pdf-actions"><a class="button" href="${escapeAttribute(pdfDownloadUrl.toString())}">원문 PDF 저장</a></div>
+        </section>`
+            : ""
+        }
         ${share.htmlBody ? `<section class="source"><h2>요약 본문</h2>${sanitizeSafeFragment(share.htmlBody)}</section>` : ""}
         <section class="notice">
           <h2>주의</h2>
@@ -145,4 +181,13 @@ function sanitizeSafeFragment(value: string) {
 
 function escapeAttribute(value: string) {
   return escapeHtml(value).replaceAll('"', "&quot;");
+}
+
+function safeDownloadName(value: string) {
+  return (
+    value
+      .replace(/[^a-zA-Z0-9가-힣._-]+/g, "-")
+      .replace(/-+/g, "-")
+      .slice(0, 80) || "hwpvoice-briefing"
+  );
 }

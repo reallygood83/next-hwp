@@ -1,6 +1,6 @@
 # 한글소리 AI / HwpVoice
 
-HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일로 바꾸는 Next.js MVP입니다.
+HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일, 선택형 원문 PDF로 바꾸는 Next.js MVP입니다.
 
 [GitHub](https://github.com/reallygood83/next-hwp) · [X @reallygood83](https://x.com/reallygood83) · [YouTube 배움의달인](https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v)
 
@@ -19,12 +19,13 @@ HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, 음성 파일로 바
 - Gemini TTS 기본 음성 생성
 - ElevenLabs API key와 Voice ID 직접 입력 기반 선택 음성 생성
 - 외부 오디오 참조 HTML, 음성 포함 단일 HTML, HTML+오디오 zip 다운로드
+- 공유 페이지에서 HTML, MP3, 선택형 원문 PDF 다운로드 제공
 - 변환된 음성 포함 HTML을 서버 저장공간에 저장하고 `/s/{id}` 공유 링크 생성
-- 공유 저장 파일은 Firebase Storage 규칙 기준 파일당 10MB 미만으로 제한
+- 공유 저장 파일은 Firebase Storage 규칙 기준 전체 10MB 미만으로 제한
 - Firebase Google 로그인으로 앱 사용 보호
 - 교사/공무원 대상 랜딩페이지 제공
 - 다문화 가정 학생·학부모 안내와 민원 답변을 다국어 음성 브리핑으로 배포하는 활용 시나리오 포함
-- Firebase Storage에 공유 오디오 저장, Firestore에 공유 페이지용 구조화 데이터 저장
+- Firebase Storage에 공유 오디오와 선택형 원문 PDF 저장, Firestore에 공유 페이지용 구조화 데이터 저장
 - 사용자별 내 공유 문서 관리 페이지 제공
 
 ## 실행
@@ -89,6 +90,6 @@ HWP/HWPX 원문 보기는 `public/rhwp-studio/`에 포함된 `rhwp-studio` WASM 
 
 UI에 입력한 Gemini 또는 ElevenLabs API key는 브리핑 생성 요청에만 포함됩니다. 키는 서버 파일, 공유 HTML, ZIP 패키지, `/s/{id}` 공유 페이지에 저장하지 않습니다. 배포형 서비스에서는 사용자가 직접 API key를 입력해야 하며, 비워둔 상태에서는 음성 브리핑 생성을 막습니다.
 
-공유 링크는 Firestore의 구조화된 브리핑 데이터와 Firebase Storage의 오디오 파일을 조합해 `/s/{id}` 서버 템플릿으로 제공합니다. 공유 페이지는 임의 HTML을 그대로 실행하지 않고 CSP를 적용합니다.
+공유 링크는 Firestore의 구조화된 브리핑 데이터와 Firebase Storage의 오디오 파일, 선택형 원문 PDF를 조합해 `/s/{id}` 서버 템플릿으로 제공합니다. 공유 페이지는 임의 HTML을 그대로 실행하지 않고 CSP를 적용합니다.
 
 서버 비용과 유지 비용 선택지는 [Deployment and Cost Notes](docs/deployment-costs.md)를 참고하세요. 공개 운영에서는 사용자별 저장 개수 제한, 파일당 10MB 제한, 만료 정책, 로컬 백업 안내를 함께 유지하는 편이 안전합니다.

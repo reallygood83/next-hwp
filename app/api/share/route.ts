@@ -31,6 +31,8 @@ export async function POST(request: Request) {
       speechProvider?: SpeechProvider;
       audioPath?: string;
       audioMimeType?: string;
+      originalPdfPath?: string;
+      originalPdfMimeType?: string;
       sizeBytes?: number;
     };
 
@@ -49,6 +51,8 @@ export async function POST(request: Request) {
       speechProvider: body.speechProvider || "gemini",
       audioPath: body.audioPath || "",
       audioMimeType: body.audioMimeType || "",
+      originalPdfPath: body.originalPdfPath || "",
+      originalPdfMimeType: body.originalPdfMimeType || "",
       sizeBytes: body.sizeBytes || 0,
     });
 
@@ -70,6 +74,7 @@ function validateShareBody(
     briefing?: BriefingResult;
     sourceFilename?: string;
     audioPath?: string;
+    originalPdfPath?: string;
     sizeBytes?: number;
   },
   uid: string,
@@ -88,6 +93,9 @@ function validateShareBody(
   }
   if (body.audioPath && !body.audioPath.startsWith(`briefings/${uid}/${body.id}/`)) {
     return "Invalid audio path.";
+  }
+  if (body.originalPdfPath && body.originalPdfPath !== `briefings/${uid}/${body.id}/original.pdf`) {
+    return "Invalid original PDF path.";
   }
   if ((body.sizeBytes || 0) > 10 * 1024 * 1024) {
     return "Shared files must be under 10MB.";

@@ -28,7 +28,7 @@ import {
   signOutUser,
 } from "@/lib/firebase";
 import { extractTextFromFile } from "@/lib/hwpx";
-import { ref, uploadString } from "firebase/storage";
+import { ref, uploadBytes, uploadString } from "firebase/storage";
 import type {
   BriefingDuration,
   BriefingLanguage,
@@ -284,6 +284,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
   const [result, setResult] = useState<BriefingResult | null>(null);
   const [audio, setAudio] = useState<BriefingResponse["audio"]>();
   const [shareUrl, setShareUrl] = useState("");
+  const [includeOriginalPdf, setIncludeOriginalPdf] = useState(false);
 
   const audioUrl = useMemo(() => {
     if (!audio) return "";
@@ -508,15 +509,40 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
       }
 
       let audioPath = "";
+      let originalPdfPath = "";
       let uploadedBytes = 0;
+      let originalPdfBlob: Blob | null = null;
+
+      if (includeOriginalPdf) {
+        if (!documentBuffer || (documentKind !== "hwp" && documentKind !== "hwpx")) {
+          throw new Error("원문 PDF는 HWP/HWPX 파일을 업로드한 경우에만 포함할 수 있습니다.");
+        }
+        originalPdfBlob = await createOriginalPdfBlob(documentBuffer, filename);
+        uploadedBytes += originalPdfBlob.size;
+        if (uploadedBytes > 10 * 1024 * 1024) {
+          throw new Error("원문 PDF가 10MB 제한을 넘었습니다. PDF 포함 옵션을 끄고 공유하세요.");
+        }
+      }
+
       if (audio) {
         audioPath = `briefings/${user.uid}/${id}/briefing.${audioExtension(audio.mimeType)}`;
-        uploadedBytes = Math.ceil((audio.base64.length * 3) / 4);
+        uploadedBytes += Math.ceil((audio.base64.length * 3) / 4);
         if (uploadedBytes > 10 * 1024 * 1024) {
-          throw new Error("공유 오디오 파일은 10MB 미만이어야 합니다. 로컬 저장을 사용하세요.");
+          throw new Error("공유 파일은 오디오와 원문 PDF를 합쳐 10MB 미만이어야 합니다. 로컬 저장을 사용하세요.");
         }
         await uploadString(ref(firebaseStorage, audioPath), audio.base64, "base64", {
           contentType: audio.mimeType,
+          customMetadata: {
+            ownerUid: user.uid,
+            shareId: id,
+          },
+        });
+      }
+
+      if (originalPdfBlob) {
+        originalPdfPath = `briefings/${user.uid}/${id}/original.pdf`;
+        await uploadBytes(ref(firebaseStorage, originalPdfPath), originalPdfBlob, {
+          contentType: "application/pdf",
           customMetadata: {
             ownerUid: user.uid,
             shareId: id,
@@ -538,6 +564,8 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
           speechProvider,
           audioPath,
           audioMimeType: audio?.mimeType || "",
+          originalPdfPath,
+          originalPdfMimeType: originalPdfBlob ? "application/pdf" : "",
           sizeBytes: uploadedBytes,
         }),
       });
@@ -587,6 +615,49 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
       filename,
       base64: arrayBufferToBase64(documentBuffer),
     };
+  }
+
+  async function createOriginalPdfBlob(buffer: ArrayBuffer, sourceName: string) {
+    const { jsPDF } = await import("jspdf");
+    const frame = document.createElement("iframe");
+    frame.src = "/rhwp-studio/index.html";
+    frame.title = "원문 PDF 변환용 rhwp 렌더러";
+    frame.style.position = "fixed";
+    frame.style.left = "-10000px";
+    frame.style.top = "0";
+    frame.style.width = "1200px";
+    frame.style.height = "900px";
+    document.body.appendChild(frame);
+
+    try {
+      await waitForFrameLoad(frame);
+      await requestRhwp(frame, "ready", {});
+      const loaded = await requestRhwp<{ pageCount?: number }>(frame, "loadFile", {
+        data: buffer.slice(0),
+        fileName: sourceName,
+      });
+      const pageCount =
+        loaded?.pageCount || (await requestRhwp<number>(frame, "pageCount", {})) || 1;
+      if (pageCount > 20) {
+        throw new Error("원문 PDF 공유는 현재 20쪽 이하 문서만 지원합니다.");
+      }
+
+      const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      for (let page = 0; page < pageCount; page += 1) {
+        const svg = await requestRhwp<string>(frame, "getPageSvg", { page });
+        const image = await svgToPngDataUrl(svg);
+        if (page > 0) pdf.addPage();
+        const fit = fitRect(image.width, image.height, pageWidth, pageHeight);
+        pdf.addImage(image.dataUrl, "PNG", fit.x, fit.y, fit.width, fit.height);
+      }
+
+      return pdf.output("blob");
+    } finally {
+      frame.remove();
+    }
   }
 
   const isBusy = state === "extracting" || state === "briefing";
@@ -1018,6 +1089,18 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
                   <Package size={17} />
                   HTML+MP3 zip
                 </button>
+                <label className="share-option">
+                  <input
+                    type="checkbox"
+                    checked={includeOriginalPdf}
+                    disabled={!documentBuffer || (documentKind !== "hwp" && documentKind !== "hwpx")}
+                    onChange={(event) => setIncludeOriginalPdf(event.target.checked)}
+                  />
+                  <span>
+                    원문 PDF도 공유에 포함
+                    <small>HWP/HWPX 원문을 PDF로 변환해 공유 페이지에 표시합니다. 전체 공유 용량은 10MB 이하입니다.</small>
+                  </span>
+                </label>
                 <button className="secondary" onClick={() => void createShareLink()}>
                   <Share2 size={17} />
                   링크 생성
@@ -1314,4 +1397,109 @@ function downloadBlob(name: string, blob: Blob) {
   anchor.download = name;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+function waitForFrameLoad(frame: HTMLIFrameElement) {
+  return new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("rhwp 렌더러 로딩 시간이 초과되었습니다.")), 12000);
+    frame.onload = () => {
+      window.clearTimeout(timeout);
+      resolve();
+    };
+  });
+}
+
+function requestRhwp<T>(
+  frame: HTMLIFrameElement,
+  method: string,
+  params: Record<string, unknown>,
+) {
+  return new Promise<T>((resolve, reject) => {
+    const id = `pdf-${method}-${crypto.randomUUID()}`;
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", receive);
+      reject(new Error(`${method} 요청 시간이 초과되었습니다.`));
+    }, 20000);
+
+    function receive(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string; id?: string; result?: T; error?: string };
+      if (data?.type !== "rhwp-response" || data.id !== id) return;
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", receive);
+      if (data.error) {
+        reject(new Error(data.error));
+      } else {
+        resolve(data.result as T);
+      }
+    }
+
+    window.addEventListener("message", receive);
+    frame.contentWindow?.postMessage(
+      {
+        type: "rhwp-request",
+        id,
+        method,
+        params,
+      },
+      window.location.origin,
+    );
+  });
+}
+
+async function svgToPngDataUrl(svg: string) {
+  const dimensions = readSvgDimensions(svg);
+  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const image = new window.Image();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("원문 페이지 이미지를 PDF로 변환하지 못했습니다."));
+      image.src = url;
+    });
+
+    const sourceWidth = dimensions.width || image.naturalWidth || 794;
+    const sourceHeight = dimensions.height || image.naturalHeight || 1123;
+    const targetWidth = Math.min(1600, Math.max(900, sourceWidth));
+    const scale = targetWidth / sourceWidth;
+    const targetHeight = Math.round(sourceHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(targetWidth);
+    canvas.height = targetHeight;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("PDF 변환용 캔버스를 만들지 못했습니다.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return {
+      dataUrl: canvas.toDataURL("image/png", 0.92),
+      width: sourceWidth,
+      height: sourceHeight,
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function readSvgDimensions(svg: string) {
+  const viewBox = svg.match(/\bviewBox=["']([^"']+)["']/i)?.[1]?.trim().split(/\s+/).map(Number);
+  if (viewBox && viewBox.length === 4 && viewBox.every(Number.isFinite)) {
+    return { width: viewBox[2], height: viewBox[3] };
+  }
+  const width = Number(svg.match(/\bwidth=["']([0-9.]+)/i)?.[1] || 0);
+  const height = Number(svg.match(/\bheight=["']([0-9.]+)/i)?.[1] || 0);
+  return { width, height };
+}
+
+function fitRect(sourceWidth: number, sourceHeight: number, maxWidth: number, maxHeight: number) {
+  const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+  const width = sourceWidth * scale;
+  const height = sourceHeight * scale;
+  return {
+    x: (maxWidth - width) / 2,
+    y: (maxHeight - height) / 2,
+    width,
+    height,
+  };
 }

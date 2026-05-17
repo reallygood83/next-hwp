@@ -18,6 +18,8 @@ export async function GET(request: Request) {
         sourceFilename: share.sourceFilename,
         language: share.language,
         speechProvider: share.speechProvider,
+        hasAudio: Boolean(share.audioPath),
+        hasOriginalPdf: Boolean(share.originalPdfPath),
         createdAt: share.createdAt,
         expiresAt: share.expiresAt,
         sizeBytes: share.sizeBytes,

@@ -12,6 +12,8 @@ type ShareItem = {
   sourceFilename: string;
   language: string;
   speechProvider: string;
+  hasAudio: boolean;
+  hasOriginalPdf: boolean;
   createdAt: string;
   expiresAt: string;
   sizeBytes: number;
@@ -133,6 +135,22 @@ export default function MySharesPage() {
                     <a className="secondary compact-button nav-link" href={`/s/${share.id}`} target="_blank" rel="noreferrer">
                       열기
                     </a>
+                    <a className="secondary compact-button nav-link" href={`/s/${share.id}?download=html`}>
+                      HTML 저장
+                    </a>
+                    {share.hasAudio ? (
+                      <a className="secondary compact-button nav-link" href={`/api/shares/${share.id}/audio`}>
+                        MP3 저장
+                      </a>
+                    ) : null}
+                    {share.hasOriginalPdf ? (
+                      <a
+                        className="secondary compact-button nav-link"
+                        href={`/api/shares/${share.id}/original-pdf?download=1`}
+                      >
+                        원문 PDF
+                      </a>
+                    ) : null}
                     <button className="secondary compact-button" onClick={() => void copyLink(share.id)}>
                       <Copy size={15} />
                       복사

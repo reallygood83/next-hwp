@@ -22,6 +22,8 @@ export type ShareRecord = {
   caveats: string[];
   audioPath: string;
   audioMimeType: string;
+  originalPdfPath: string;
+  originalPdfMimeType: string;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -137,6 +139,8 @@ export async function createShareDocument({
   speechProvider,
   audioPath,
   audioMimeType,
+  originalPdfPath,
+  originalPdfMimeType,
   sizeBytes,
 }: {
   idToken: string;
@@ -148,6 +152,8 @@ export async function createShareDocument({
   speechProvider: string;
   audioPath: string;
   audioMimeType: string;
+  originalPdfPath: string;
+  originalPdfMimeType: string;
   sizeBytes: number;
 }) {
   const now = new Date();
@@ -167,6 +173,8 @@ export async function createShareDocument({
     caveats: briefing.caveats.map((caveat) => limitText(caveat, 500)).slice(0, 6),
     audioPath,
     audioMimeType,
+    originalPdfPath,
+    originalPdfMimeType,
     isPublic: true,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -267,6 +275,8 @@ function parseShareDocument(document: FirestoreDocument): ShareRecord | null {
     caveats: arrayStringField(fields.caveats),
     audioPath: stringField(fields.audioPath),
     audioMimeType: stringField(fields.audioMimeType),
+    originalPdfPath: stringField(fields.originalPdfPath),
+    originalPdfMimeType: stringField(fields.originalPdfMimeType),
     isPublic: Boolean(fields.isPublic?.booleanValue),
     createdAt: stringField(fields.createdAt) || fields.createdAt?.timestampValue || "",
     updatedAt: stringField(fields.updatedAt) || fields.updatedAt?.timestampValue || "",
@@ -291,6 +301,8 @@ function shareToFields(share: ShareRecord): Record<string, FirestoreValue> {
     caveats: arrayValue(share.caveats),
     audioPath: stringValue(share.audioPath),
     audioMimeType: stringValue(share.audioMimeType),
+    originalPdfPath: stringValue(share.originalPdfPath),
+    originalPdfMimeType: stringValue(share.originalPdfMimeType),
     isPublic: { booleanValue: share.isPublic },
     createdAt: timestampValue(share.createdAt),
     updatedAt: timestampValue(share.updatedAt),

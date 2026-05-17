@@ -25,6 +25,8 @@ service cloud.firestore {
           "caveats",
           "audioPath",
           "audioMimeType",
+          "originalPdfPath",
+          "originalPdfMimeType",
           "isPublic",
           "createdAt",
           "updatedAt",
@@ -41,6 +43,10 @@ service cloud.firestore {
         && (
           request.resource.data.audioPath == ""
           || request.resource.data.audioPath.matches("^briefings/" + request.auth.uid + "/" + shareId + "/[^/]+$")
+        )
+        && (
+          request.resource.data.originalPdfPath == ""
+          || request.resource.data.originalPdfPath == "briefings/" + request.auth.uid + "/" + shareId + "/original.pdf"
         );
 
       allow read: if resource.data.isPublic == true
