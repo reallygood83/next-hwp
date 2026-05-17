@@ -5,11 +5,12 @@ HWP/HWPX 문서를 짧은 브리핑 대본, 공유용 HTML, MP3 음성으로 바
 ## 기능
 
 - HWPX 파일에서 XML 텍스트 추출
+- HWPX/TXT/MD 문서를 페이지형 HTML 뷰어로 미리보기
 - HWP 파일은 현재 안전한 fallback 안내 제공
 - 텍스트 직접 붙여넣기 지원
 - Gemini structured output 기반 브리핑 생성
 - ElevenLabs TTS 기반 MP3 생성
-- HTML+MP3 공유 패키지 다운로드
+- 외부 MP3 참조 HTML, 음성 포함 단일 HTML, HTML+MP3 zip 다운로드
 
 ## 실행
 

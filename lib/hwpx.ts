@@ -2,13 +2,16 @@ import JSZip from "jszip";
 import type { ExtractionResult } from "./types";
 
 const TEXT_TAGS = new Set(["t", "hp:t", "text"]);
+const PARAGRAPH_TAGS = new Set(["p", "hp:p"]);
 
 export async function extractTextFromFile(file: File): Promise<ExtractionResult> {
   const name = file.name.toLowerCase();
 
   if (name.endsWith(".txt") || name.endsWith(".md")) {
+    const text = await file.text();
     return {
-      text: await file.text(),
+      text,
+      html: textToPreviewHtml(text),
       warnings: [],
     };
   }
@@ -20,6 +23,7 @@ export async function extractTextFromFile(file: File): Promise<ExtractionResult>
   if (name.endsWith(".hwp")) {
     return {
       text: "",
+      html: "",
       warnings: [
         "HWP binary extraction is not implemented in this web MVP. Paste extracted text or use an HWPX file.",
       ],
@@ -28,6 +32,7 @@ export async function extractTextFromFile(file: File): Promise<ExtractionResult>
 
   return {
     text: "",
+    html: "",
     warnings: ["Only HWPX, TXT, and Markdown files can be extracted in this MVP."],
   };
 }
@@ -41,39 +46,67 @@ async function extractTextFromHwpx(buffer: ArrayBuffer): Promise<ExtractionResul
   if (sectionFiles.length === 0) {
     return {
       text: "",
+      html: "",
       warnings: ["No HWPX section XML files were found."],
     };
   }
 
-  const pages: string[] = [];
+  const pages: string[][] = [];
   for (const entry of sectionFiles) {
     const xml = await entry.async("text");
-    pages.push(extractXmlText(xml));
+    pages.push(extractXmlParagraphs(xml));
   }
 
+  const paragraphs = pages.flat().filter(Boolean);
+
   return {
-    text: normalizeWhitespace(pages.join("\n\n")),
+    text: normalizeWhitespace(paragraphs.join("\n\n")),
+    html: paragraphsToPreviewHtml(paragraphs),
     warnings: [],
   };
 }
 
-function extractXmlText(xml: string): string {
+function extractXmlParagraphs(xml: string): string[] {
   if (typeof DOMParser !== "undefined") {
     const doc = new DOMParser().parseFromString(xml, "application/xml");
-    const parts: string[] = [];
+    const paragraphNodes = [...doc.querySelectorAll("*")].filter((node) =>
+      PARAGRAPH_TAGS.has(node.tagName.toLowerCase()),
+    );
+    const paragraphs = paragraphNodes.map((paragraph) => {
+      const parts: string[] = [];
+      paragraph.querySelectorAll("*").forEach((node) => {
+        const tag = node.tagName.toLowerCase();
+        if (TEXT_TAGS.has(tag) && node.textContent) {
+          parts.push(node.textContent);
+        }
+      });
+      return normalizeWhitespace(parts.join(""));
+    });
+
+    if (paragraphs.some(Boolean)) {
+      return paragraphs;
+    }
+
+    const fallbackParts: string[] = [];
     doc.querySelectorAll("*").forEach((node) => {
-      const tag = node.tagName.toLowerCase();
-      if (TEXT_TAGS.has(tag) && node.textContent) {
-        parts.push(node.textContent);
+      if (TEXT_TAGS.has(node.tagName.toLowerCase()) && node.textContent) {
+        fallbackParts.push(node.textContent);
       }
     });
-    return parts.join(" ");
+    return [normalizeWhitespace(fallbackParts.join(" "))];
   }
 
-  const parts = [...xml.matchAll(/<[^:>]*:?t[^>]*>([\s\S]*?)<\/[^:>]*:?t>/gi)].map(
-    (match) => decodeXmlEntities(stripTags(match[1] ?? "")),
-  );
-  return parts.join(" ");
+  const paragraphMatches = [
+    ...xml.matchAll(/<[^:>]*:?p(?:\s[^>]*)?>([\s\S]*?)<\/[^:>]*:?p>/gi),
+  ];
+  const source = paragraphMatches.length > 0 ? paragraphMatches.map((m) => m[1] ?? "") : [xml];
+
+  return source.map((fragment) => {
+    const parts = [
+      ...fragment.matchAll(/<[^:>]*:?t(?:\s[^>]*)?>([\s\S]*?)<\/[^:>]*:?t>/gi),
+    ].map((match) => decodeXmlEntities(stripTags(match[1] ?? "")));
+    return normalizeWhitespace(parts.join(""));
+  });
 }
 
 function stripTags(value: string): string {
@@ -95,4 +128,28 @@ function normalizeWhitespace(value: string): string {
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function textToPreviewHtml(text: string): string {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map(normalizeWhitespace)
+    .filter(Boolean);
+  return paragraphsToPreviewHtml(paragraphs.length > 0 ? paragraphs : [text]);
+}
+
+function paragraphsToPreviewHtml(paragraphs: string[]): string {
+  return paragraphs
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+    .join("\n");
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }

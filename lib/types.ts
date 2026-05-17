@@ -30,5 +30,6 @@ export type BriefingResponse = {
 
 export type ExtractionResult = {
   text: string;
+  html: string;
   warnings: string[];
 };

@@ -217,19 +217,6 @@ button {
   overflow: hidden;
 }
 
-.empty {
-  height: 100%;
-  min-height: 560px;
-  display: grid;
-  place-items: center;
-  text-align: center;
-  color: var(--muted);
-}
-
-.empty-inner {
-  max-width: 470px;
-}
-
 .result-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -282,6 +269,76 @@ button {
   align-content: start;
 }
 
+.doc-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.doc-preview.compact {
+  margin-top: 8px;
+}
+
+.doc-preview-toolbar {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #475467;
+  background: #fbfcfd;
+  font-size: 13px;
+}
+
+.doc-preview-toolbar span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.doc-page {
+  width: min(100%, 760px);
+  min-height: 820px;
+  margin: 0 auto;
+  padding: 54px 62px;
+  border: 1px solid #d1d8e3;
+  border-radius: 4px;
+  background: white;
+  box-shadow: 0 18px 42px rgba(24, 37, 56, 0.14);
+  color: #111827;
+  font-family:
+    "Apple SD Gothic Neo", "Malgun Gothic", "Nanum Gothic", "Noto Sans KR",
+    serif;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.compact .doc-page {
+  min-height: 360px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 34px 40px;
+  box-shadow: 0 12px 28px rgba(24, 37, 56, 0.1);
+}
+
+.doc-page p {
+  margin: 0 0 13px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.doc-empty {
+  min-height: 460px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+  color: var(--muted);
+}
+
 audio {
   width: 100%;
 }
@@ -305,6 +362,11 @@ audio {
   .result {
     min-height: auto;
   }
+
+  .doc-page {
+    min-height: 620px;
+    padding: 38px 34px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -322,5 +384,10 @@ audio {
 
   .brief-title {
     font-size: 24px;
+  }
+
+  .doc-page {
+    padding: 28px 20px;
+    font-size: 14px;
   }
 }

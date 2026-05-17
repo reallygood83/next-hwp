@@ -5,6 +5,7 @@ import {
   Download,
   FileAudio,
   FileText,
+  FileType,
   Loader2,
   Mic,
   Package,
@@ -12,6 +13,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import JSZip from "jszip";
 import { buildBriefingHtml } from "@/lib/html-export";
 import { extractTextFromFile } from "@/lib/hwpx";
 import type {
@@ -26,9 +28,12 @@ type WorkState = "idle" | "extracting" | "briefing" | "done" | "error";
 const sampleText =
   "이 문서는 한글 문서를 빠르게 이해하기 위한 AI 음성 브리핑 기능 제안서입니다. 사용자는 HWP 또는 HWPX 문서를 열고 핵심 요약, 브리핑 대본, HTML 공유 파일, MP3 음성 파일을 생성할 수 있습니다. Gemini API는 구조화된 요약을 만들고 ElevenLabs API는 자연스러운 한국어 음성을 생성합니다. API 키는 안전하게 관리해야 하며 문서 내용이 외부 API로 전송된다는 점을 명확히 고지해야 합니다.";
 
+const sampleHtml = textToPreviewHtml(sampleText);
+
 export default function Home() {
   const [filename, setFilename] = useState("sample.txt");
   const [text, setText] = useState(sampleText);
+  const [documentHtml, setDocumentHtml] = useState(sampleHtml);
   const [duration, setDuration] = useState<BriefingDuration>("standard");
   const [style, setStyle] = useState<BriefingStyle>("work");
   const [voiceId, setVoiceId] = useState("");
@@ -53,6 +58,7 @@ export default function Home() {
     try {
       const extracted = await extractTextFromFile(file);
       setText(extracted.text);
+      setDocumentHtml(extracted.html || textToPreviewHtml(extracted.text));
       setWarnings(extracted.warnings);
       setState("idle");
     } catch {
@@ -118,9 +124,41 @@ export default function Home() {
     if (!result) return;
     downloadTextFile(
       safeBaseName(filename) + "-briefing.html",
-      buildBriefingHtml(result, safeBaseName(filename) + "-briefing.mp3"),
+      buildBriefingHtml(result, {
+        audioFilename: safeBaseName(filename) + "-briefing.mp3",
+        sourceHtml: documentHtml,
+      }),
       "text/html;charset=utf-8",
     );
+  }
+
+  function downloadEmbeddedHtml() {
+    if (!result) return;
+    downloadTextFile(
+      safeBaseName(filename) + "-briefing-embedded.html",
+      buildBriefingHtml(result, {
+        audioFilename: safeBaseName(filename) + "-briefing.mp3",
+        embeddedAudio: audio,
+        sourceHtml: documentHtml,
+      }),
+      "text/html;charset=utf-8",
+    );
+  }
+
+  async function downloadPackage() {
+    if (!result) return;
+    const baseName = safeBaseName(filename);
+    const html = buildBriefingHtml(result, {
+      audioFilename: `${baseName}-briefing.mp3`,
+      sourceHtml: documentHtml,
+    });
+    const zip = new JSZip();
+    zip.file(`${baseName}-briefing.html`, html);
+    if (audio) {
+      zip.file(`${baseName}-briefing.mp3`, audio.base64, { base64: true });
+    }
+    const blob = await zip.generateAsync({ type: "blob" });
+    downloadBlob(`${baseName}-briefing-package.zip`, blob);
   }
 
   const isBusy = state === "extracting" || state === "briefing";
@@ -226,7 +264,14 @@ export default function Home() {
                   ? "생성 중"
                   : "AI 브리핑 만들기"}
             </button>
-            <button className="secondary" onClick={() => setText(sampleText)}>
+            <button
+              className="secondary"
+              onClick={() => {
+                setText(sampleText);
+                setDocumentHtml(sampleHtml);
+                setFilename("sample.txt");
+              }}
+            >
               <FileText size={17} />
               샘플
             </button>
@@ -235,16 +280,7 @@ export default function Home() {
 
         <section className="panel result" aria-label="브리핑 결과">
           {!result ? (
-            <div className="empty">
-              <div className="empty-inner">
-                <FileAudio size={44} aria-hidden="true" />
-                <h1>문서를 들을 수 있는 브리핑으로 변환</h1>
-                <p>
-                  HWPX 파일을 올리거나 본문을 붙여넣으면 요약, 음성 대본, 공유용 HTML,
-                  MP3 음성 파일을 한 번에 생성합니다.
-                </p>
-              </div>
-            </div>
+            <DocumentPreview filename={filename} html={documentHtml} text={text} />
           ) : (
             <div className="result-grid">
               <article>
@@ -258,6 +294,8 @@ export default function Home() {
                 </ul>
                 <h2>브리핑 대본</h2>
                 <div className="script">{result.briefingScript}</div>
+                <h2>원문 보기</h2>
+                <DocumentPreview filename={filename} html={documentHtml} text={text} compact />
               </article>
 
               <aside className="side-card">
@@ -277,6 +315,14 @@ export default function Home() {
                   <Package size={17} />
                   HTML 저장
                 </button>
+                <button className="secondary" disabled={!audio} onClick={downloadEmbeddedHtml}>
+                  <FileType size={17} />
+                  음성 포함 HTML
+                </button>
+                <button className="secondary" onClick={() => void downloadPackage()}>
+                  <Package size={17} />
+                  HTML+MP3 zip
+                </button>
               </aside>
             </div>
           )}
@@ -286,10 +332,74 @@ export default function Home() {
   );
 }
 
+function DocumentPreview({
+  filename,
+  html,
+  text,
+  compact = false,
+}: {
+  filename: string;
+  html: string;
+  text: string;
+  compact?: boolean;
+}) {
+  const bodyHtml = html || textToPreviewHtml(text);
+
+  return (
+    <div className={compact ? "doc-preview compact" : "doc-preview"}>
+      <div className="doc-preview-toolbar">
+        <span>
+          <FileText size={16} aria-hidden="true" />
+          {filename}
+        </span>
+        <span>{text.trim().length.toLocaleString()}자</span>
+      </div>
+      <div className="doc-page">
+        {bodyHtml ? (
+          <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+        ) : (
+          <div className="doc-empty">
+            <FileAudio size={34} aria-hidden="true" />
+            <h1>문서를 들을 수 있는 브리핑으로 변환</h1>
+            <p>HWPX 파일을 올리거나 본문을 붙여넣으면 문서 보기와 브리핑을 함께 만듭니다.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function safeBaseName(filename: string) {
   return filename
     .replace(/\.[^.]+$/, "")
     .replace(/[^a-zA-Z0-9가-힣._-]+/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 80);
+}
+
+function textToPreviewHtml(value: string) {
+  return value
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+    .join("");
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function downloadBlob(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
