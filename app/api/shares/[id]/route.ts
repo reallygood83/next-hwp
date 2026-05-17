@@ -34,6 +34,12 @@ export async function DELETE(
     if (share.originalPdfPath) {
       await deleteStorageObject(idToken, share.originalPdfPath);
     }
+    if (share.originalPreviewPath) {
+      await deleteStorageObject(idToken, share.originalPreviewPath);
+    }
+    if (share.originalFilePath) {
+      await deleteStorageObject(idToken, share.originalFilePath);
+    }
     await deleteShareDocument(idToken, id);
     return Response.json({ ok: true });
   } catch {

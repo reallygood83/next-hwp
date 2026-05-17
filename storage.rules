@@ -9,6 +9,11 @@ service firebase.storage {
         && (
           request.resource.contentType.matches('audio/.*')
           || request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'text/html'
+          || request.resource.contentType == 'application/x-hwp'
+          || request.resource.contentType == 'application/haansofthwp'
+          || request.resource.contentType == 'application/vnd.hancom.hwpx'
+          || request.resource.contentType == 'application/octet-stream'
         );
 
       allow delete: if request.auth != null

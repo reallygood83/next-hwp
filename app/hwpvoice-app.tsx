@@ -11,6 +11,7 @@ import {
   FileType,
   Loader2,
   Lock,
+  Menu,
   Package,
   Share2,
   Sparkles,
@@ -285,6 +286,8 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
   const [audio, setAudio] = useState<BriefingResponse["audio"]>();
   const [shareUrl, setShareUrl] = useState("");
   const [includeOriginalPdf, setIncludeOriginalPdf] = useState(false);
+  const [includeOriginalViewer, setIncludeOriginalViewer] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const audioUrl = useMemo(() => {
     if (!audio) return "";
@@ -510,17 +513,33 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
 
       let audioPath = "";
       let originalPdfPath = "";
+      let originalPreviewPath = "";
+      let originalFilePath = "";
       let uploadedBytes = 0;
       let originalPdfBlob: Blob | null = null;
+      let originalPreviewBlob: Blob | null = null;
 
       if (includeOriginalPdf) {
         if (!documentBuffer || (documentKind !== "hwp" && documentKind !== "hwpx")) {
           throw new Error("원문 PDF는 HWP/HWPX 파일을 업로드한 경우에만 포함할 수 있습니다.");
         }
-        originalPdfBlob = await createOriginalPdfBlob(documentBuffer, filename);
+        const artifacts = await createOriginalArtifacts(documentBuffer, filename);
+        originalPdfBlob = artifacts.pdfBlob;
+        originalPreviewBlob = artifacts.previewBlob;
         uploadedBytes += originalPdfBlob.size;
+        uploadedBytes += originalPreviewBlob.size;
         if (uploadedBytes > 10 * 1024 * 1024) {
-          throw new Error("원문 PDF가 10MB 제한을 넘었습니다. PDF 포함 옵션을 끄고 공유하세요.");
+          throw new Error("원문 PDF와 미리보기가 10MB 제한을 넘었습니다. PDF 포함 옵션을 끄고 공유하세요.");
+        }
+      }
+
+      if (includeOriginalViewer) {
+        if (!documentBuffer || (documentKind !== "hwp" && documentKind !== "hwpx")) {
+          throw new Error("HWP 뷰어 공유는 HWP/HWPX 파일을 업로드한 경우에만 사용할 수 있습니다.");
+        }
+        uploadedBytes += documentBuffer.byteLength;
+        if (uploadedBytes > 10 * 1024 * 1024) {
+          throw new Error("원본 HWP/HWPX까지 포함하면 10MB 제한을 넘습니다. HWP 뷰어 공유 옵션을 끄세요.");
         }
       }
 
@@ -550,6 +569,30 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
         });
       }
 
+      if (originalPreviewBlob) {
+        originalPreviewPath = `briefings/${user.uid}/${id}/original-preview.html`;
+        await uploadBytes(ref(firebaseStorage, originalPreviewPath), originalPreviewBlob, {
+          contentType: "text/html",
+          customMetadata: {
+            ownerUid: user.uid,
+            shareId: id,
+          },
+        });
+      }
+
+      if (includeOriginalViewer && documentBuffer) {
+        originalFilePath = `briefings/${user.uid}/${id}/original.${documentKind}`;
+        await uploadBytes(ref(firebaseStorage, originalFilePath), new Blob([documentBuffer], {
+          type: originalDocumentMimeType(documentKind),
+        }), {
+          contentType: originalDocumentMimeType(documentKind),
+          customMetadata: {
+            ownerUid: user.uid,
+            shareId: id,
+          },
+        });
+      }
+
       const response = await fetch("/api/share", {
         method: "POST",
         headers: {
@@ -566,6 +609,10 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
           audioMimeType: audio?.mimeType || "",
           originalPdfPath,
           originalPdfMimeType: originalPdfBlob ? "application/pdf" : "",
+          originalPreviewPath,
+          originalPreviewMimeType: originalPreviewBlob ? "text/html; charset=utf-8" : "",
+          originalFilePath,
+          originalFileMimeType: includeOriginalViewer ? originalDocumentMimeType(documentKind) : "",
           sizeBytes: uploadedBytes,
         }),
       });
@@ -617,7 +664,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
     };
   }
 
-  async function createOriginalPdfBlob(buffer: ArrayBuffer, sourceName: string) {
+  async function createOriginalArtifacts(buffer: ArrayBuffer, sourceName: string) {
     const { jsPDF } = await import("jspdf");
     const frame = document.createElement("iframe");
     frame.src = "/rhwp-studio/index.html";
@@ -645,16 +692,23 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
       const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      const svgPages: string[] = [];
 
       for (let page = 0; page < pageCount; page += 1) {
         const svg = await requestRhwp<string>(frame, "getPageSvg", { page });
+        svgPages.push(svg);
         const image = await svgToPngDataUrl(svg);
         if (page > 0) pdf.addPage();
         const fit = fitRect(image.width, image.height, pageWidth, pageHeight);
         pdf.addImage(image.dataUrl, "PNG", fit.x, fit.y, fit.width, fit.height);
       }
 
-      return pdf.output("blob");
+      return {
+        pdfBlob: pdf.output("blob"),
+        previewBlob: new Blob([buildOriginalPreviewHtml(svgPages, sourceName)], {
+          type: "text/html;charset=utf-8",
+        }),
+      };
     } finally {
       frame.remove();
     }
@@ -751,6 +805,16 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
           </span>
         </Link>
         <div className="topbar-actions">
+          <button
+            className="account-button mobile-settings-toggle"
+            type="button"
+            aria-expanded={settingsOpen}
+            aria-controls="briefing-settings"
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            <Menu size={15} />
+            설정
+          </button>
           <span className="status-pill">
             <Sparkles size={15} aria-hidden="true" />
             Gemini 2.5 TTS 기본
@@ -773,7 +837,11 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
       </header>
 
       <div className="workspace">
-        <section className="panel controls" aria-label="브리핑 설정">
+        <section
+          id="briefing-settings"
+          className={settingsOpen ? "panel controls mobile-open" : "panel controls"}
+          aria-label="브리핑 설정"
+        >
           <div>
             <p className="section-title">문서</p>
             <div className="dropzone">
@@ -1101,6 +1169,18 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
                     <small>HWP/HWPX 원문을 PDF로 변환해 공유 페이지에 표시합니다. 전체 공유 용량은 10MB 이하입니다.</small>
                   </span>
                 </label>
+                <label className="share-option">
+                  <input
+                    type="checkbox"
+                    checked={includeOriginalViewer}
+                    disabled={!documentBuffer || (documentKind !== "hwp" && documentKind !== "hwpx")}
+                    onChange={(event) => setIncludeOriginalViewer(event.target.checked)}
+                  />
+                  <span>
+                    HWP 뷰어도 공유에 포함
+                    <small>원본 HWP/HWPX 파일을 저장해 공유 페이지에서 rhwp 뷰어로 열 수 있게 합니다. 개인정보 문서는 신중히 사용하세요.</small>
+                  </span>
+                </label>
                 <button className="secondary" onClick={() => void createShareLink()}>
                   <Share2 size={17} />
                   링크 생성
@@ -1355,6 +1435,12 @@ function audioExtension(mimeType?: string) {
   return "audio";
 }
 
+function originalDocumentMimeType(kind: "hwp" | "hwpx" | "text") {
+  if (kind === "hwpx") return "application/vnd.hancom.hwpx";
+  if (kind === "hwp") return "application/x-hwp";
+  return "text/plain";
+}
+
 function toArrayBuffer(bytes: Uint8Array) {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
@@ -1502,4 +1588,36 @@ function fitRect(sourceWidth: number, sourceHeight: number, maxWidth: number, ma
     width,
     height,
   };
+}
+
+function buildOriginalPreviewHtml(svgPages: string[], filename: string) {
+  const pages = svgPages
+    .map(
+      (svg, index) => `<section class="page" aria-label="${index + 1}쪽">${sanitizeSvg(svg)}</section>`,
+    )
+    .join("");
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(filename)} 원문 미리보기</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 18px; background: #eef2f6; color: #111827; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .page { width: min(100%, 860px); margin: 0 auto 18px; padding: 0; background: #fff; box-shadow: 0 10px 30px rgba(17,24,39,.12); overflow: auto; }
+    .page svg { display: block; width: 100%; height: auto; background: #fff; }
+  </style>
+</head>
+<body>${pages || "<p>원문 미리보기를 생성하지 못했습니다.</p>"}</body>
+</html>`;
+}
+
+function sanitizeSvg(svg: string) {
+  return svg
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+='[^']*'/gi, "")
+    .replace(/\shref=["'](?!data:|#)[^"']*["']/gi, "")
+    .replace(/\sxlink:href=["'](?!data:|#)[^"']*["']/gi, "");
 }

@@ -20,6 +20,8 @@ export async function GET(request: Request) {
         speechProvider: share.speechProvider,
         hasAudio: Boolean(share.audioPath),
         hasOriginalPdf: Boolean(share.originalPdfPath),
+        hasOriginalPreview: Boolean(share.originalPreviewPath),
+        hasOriginalFile: Boolean(share.originalFilePath),
         createdAt: share.createdAt,
         expiresAt: share.expiresAt,
         sizeBytes: share.sizeBytes,

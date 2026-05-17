@@ -24,6 +24,10 @@ export type ShareRecord = {
   audioMimeType: string;
   originalPdfPath: string;
   originalPdfMimeType: string;
+  originalPreviewPath: string;
+  originalPreviewMimeType: string;
+  originalFilePath: string;
+  originalFileMimeType: string;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
@@ -141,6 +145,10 @@ export async function createShareDocument({
   audioMimeType,
   originalPdfPath,
   originalPdfMimeType,
+  originalPreviewPath,
+  originalPreviewMimeType,
+  originalFilePath,
+  originalFileMimeType,
   sizeBytes,
 }: {
   idToken: string;
@@ -154,6 +162,10 @@ export async function createShareDocument({
   audioMimeType: string;
   originalPdfPath: string;
   originalPdfMimeType: string;
+  originalPreviewPath: string;
+  originalPreviewMimeType: string;
+  originalFilePath: string;
+  originalFileMimeType: string;
   sizeBytes: number;
 }) {
   const now = new Date();
@@ -175,6 +187,10 @@ export async function createShareDocument({
     audioMimeType,
     originalPdfPath,
     originalPdfMimeType,
+    originalPreviewPath,
+    originalPreviewMimeType,
+    originalFilePath,
+    originalFileMimeType,
     isPublic: true,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -277,6 +293,10 @@ function parseShareDocument(document: FirestoreDocument): ShareRecord | null {
     audioMimeType: stringField(fields.audioMimeType),
     originalPdfPath: stringField(fields.originalPdfPath),
     originalPdfMimeType: stringField(fields.originalPdfMimeType),
+    originalPreviewPath: stringField(fields.originalPreviewPath),
+    originalPreviewMimeType: stringField(fields.originalPreviewMimeType),
+    originalFilePath: stringField(fields.originalFilePath),
+    originalFileMimeType: stringField(fields.originalFileMimeType),
     isPublic: Boolean(fields.isPublic?.booleanValue),
     createdAt: stringField(fields.createdAt) || fields.createdAt?.timestampValue || "",
     updatedAt: stringField(fields.updatedAt) || fields.updatedAt?.timestampValue || "",
@@ -303,6 +323,10 @@ function shareToFields(share: ShareRecord): Record<string, FirestoreValue> {
     audioMimeType: stringValue(share.audioMimeType),
     originalPdfPath: stringValue(share.originalPdfPath),
     originalPdfMimeType: stringValue(share.originalPdfMimeType),
+    originalPreviewPath: stringValue(share.originalPreviewPath),
+    originalPreviewMimeType: stringValue(share.originalPreviewMimeType),
+    originalFilePath: stringValue(share.originalFilePath),
+    originalFileMimeType: stringValue(share.originalFileMimeType),
     isPublic: { booleanValue: share.isPublic },
     createdAt: timestampValue(share.createdAt),
     updatedAt: timestampValue(share.updatedAt),

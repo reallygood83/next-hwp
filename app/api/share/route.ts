@@ -33,6 +33,10 @@ export async function POST(request: Request) {
       audioMimeType?: string;
       originalPdfPath?: string;
       originalPdfMimeType?: string;
+      originalPreviewPath?: string;
+      originalPreviewMimeType?: string;
+      originalFilePath?: string;
+      originalFileMimeType?: string;
       sizeBytes?: number;
     };
 
@@ -53,6 +57,10 @@ export async function POST(request: Request) {
       audioMimeType: body.audioMimeType || "",
       originalPdfPath: body.originalPdfPath || "",
       originalPdfMimeType: body.originalPdfMimeType || "",
+      originalPreviewPath: body.originalPreviewPath || "",
+      originalPreviewMimeType: body.originalPreviewMimeType || "",
+      originalFilePath: body.originalFilePath || "",
+      originalFileMimeType: body.originalFileMimeType || "",
       sizeBytes: body.sizeBytes || 0,
     });
 
@@ -75,6 +83,8 @@ function validateShareBody(
     sourceFilename?: string;
     audioPath?: string;
     originalPdfPath?: string;
+    originalPreviewPath?: string;
+    originalFilePath?: string;
     sizeBytes?: number;
   },
   uid: string,
@@ -96,6 +106,15 @@ function validateShareBody(
   }
   if (body.originalPdfPath && body.originalPdfPath !== `briefings/${uid}/${body.id}/original.pdf`) {
     return "Invalid original PDF path.";
+  }
+  if (
+    body.originalPreviewPath &&
+    body.originalPreviewPath !== `briefings/${uid}/${body.id}/original-preview.html`
+  ) {
+    return "Invalid original preview path.";
+  }
+  if (body.originalFilePath && !body.originalFilePath.startsWith(`briefings/${uid}/${body.id}/original.`)) {
+    return "Invalid original file path.";
   }
   if ((body.sizeBytes || 0) > 10 * 1024 * 1024) {
     return "Shared files must be under 10MB.";

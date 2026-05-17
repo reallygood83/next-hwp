@@ -57,6 +57,13 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
   const pdfViewUrl = new URL(`/api/shares/${share.id}/original-pdf`, url.origin);
   const pdfDownloadUrl = new URL(`/api/shares/${share.id}/original-pdf`, url.origin);
   pdfDownloadUrl.searchParams.set("download", "1");
+  const originalPreviewUrl = new URL(`/api/shares/${share.id}/original-preview`, url.origin);
+  const originalFileUrl = new URL(`/api/shares/${share.id}/original-file`, url.origin);
+  const originalFileDownloadUrl = new URL(`/api/shares/${share.id}/original-file`, url.origin);
+  originalFileDownloadUrl.searchParams.set("download", "1");
+  const rhwpViewerUrl = new URL("/rhwp-studio/index.html", url.origin);
+  rhwpViewerUrl.searchParams.set("url", originalFileUrl.toString());
+  rhwpViewerUrl.searchParams.set("filename", share.sourceFilename || "document.hwp");
   const keyPoints = share.keyPoints.map((point) => `<li>${escapeHtml(point)}</li>`).join("");
   const caveats =
     share.caveats.map((caveat) => `<li>${escapeHtml(caveat)}</li>`).join("") ||
@@ -130,6 +137,7 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
           <a class="button" href="${escapeAttribute(htmlDownloadUrl.toString())}">HTML 저장</a>
           ${audioSrc ? `<a class="button" href="${escapeAttribute(audioDownloadUrl.toString())}">MP3 저장</a>` : ""}
           ${share.originalPdfPath ? `<a class="button" href="${escapeAttribute(pdfDownloadUrl.toString())}">원문 PDF 저장</a>` : ""}
+          ${share.originalFilePath ? `<a class="button" href="${escapeAttribute(originalFileDownloadUrl.toString())}">원본 HWP 저장</a>` : ""}
         </div>
       </header>
       <div class="content">
@@ -147,12 +155,21 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
           <div class="script">${escapeHtml(share.briefingScript)}</div>
         </details>
         ${
-          share.originalPdfPath
+          share.originalPreviewPath || share.originalPdfPath
             ? `<section>
-          <h2>원문 PDF</h2>
-          <iframe class="pdf-frame" title="원문 PDF" src="${escapeAttribute(pdfViewUrl.toString())}"></iframe>
-          <div class="pdf-actions"><a class="button" href="${escapeAttribute(pdfDownloadUrl.toString())}">원문 PDF 저장</a></div>
+          <h2>원문 보기</h2>
+          <iframe class="pdf-frame" title="원문 미리보기" src="${escapeAttribute((share.originalPreviewPath ? originalPreviewUrl : pdfViewUrl).toString())}"></iframe>
+          <div class="pdf-actions">${share.originalPdfPath ? `<a class="button" href="${escapeAttribute(pdfDownloadUrl.toString())}">원문 PDF 저장</a>` : ""}</div>
         </section>`
+            : ""
+        }
+        ${
+          share.originalFilePath
+            ? `<details class="script-panel">
+          <summary>HWP 뷰어로 원문 열기</summary>
+          <iframe class="pdf-frame" title="HWP 원문 뷰어" src="${escapeAttribute(rhwpViewerUrl.toString())}"></iframe>
+          <div class="pdf-actions"><a class="button" href="${escapeAttribute(originalFileDownloadUrl.toString())}">원본 HWP 저장</a></div>
+        </details>`
             : ""
         }
         ${share.htmlBody ? `<section class="source"><h2>요약 본문</h2>${sanitizeSafeFragment(share.htmlBody)}</section>` : ""}

@@ -14,6 +14,7 @@ type ShareItem = {
   speechProvider: string;
   hasAudio: boolean;
   hasOriginalPdf: boolean;
+  hasOriginalFile: boolean;
   createdAt: string;
   expiresAt: string;
   sizeBytes: number;
@@ -149,6 +150,14 @@ export default function MySharesPage() {
                         href={`/api/shares/${share.id}/original-pdf?download=1`}
                       >
                         원문 PDF
+                      </a>
+                    ) : null}
+                    {share.hasOriginalFile ? (
+                      <a
+                        className="secondary compact-button nav-link"
+                        href={`/api/shares/${share.id}/original-file?download=1`}
+                      >
+                        원본 HWP
                       </a>
                     ) : null}
                     <button className="secondary compact-button" onClick={() => void copyLink(share.id)}>

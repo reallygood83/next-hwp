@@ -27,6 +27,10 @@ service cloud.firestore {
           "audioMimeType",
           "originalPdfPath",
           "originalPdfMimeType",
+          "originalPreviewPath",
+          "originalPreviewMimeType",
+          "originalFilePath",
+          "originalFileMimeType",
           "isPublic",
           "createdAt",
           "updatedAt",
@@ -47,6 +51,14 @@ service cloud.firestore {
         && (
           request.resource.data.originalPdfPath == ""
           || request.resource.data.originalPdfPath == "briefings/" + request.auth.uid + "/" + shareId + "/original.pdf"
+        )
+        && (
+          request.resource.data.originalPreviewPath == ""
+          || request.resource.data.originalPreviewPath == "briefings/" + request.auth.uid + "/" + shareId + "/original-preview.html"
+        )
+        && (
+          request.resource.data.originalFilePath == ""
+          || request.resource.data.originalFilePath.matches("^briefings/" + request.auth.uid + "/" + shareId + "/original\\.(hwp|hwpx)$")
         );
 
       allow read: if resource.data.isPublic == true
