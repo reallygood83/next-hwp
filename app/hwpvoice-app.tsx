@@ -681,7 +681,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
   async function createOriginalArtifacts(buffer: ArrayBuffer, sourceName: string) {
     const { jsPDF } = await import("jspdf");
     const frame = document.createElement("iframe");
-    frame.src = "/rhwp-studio/index.html";
+    frame.src = "/rhwp-host.html";
     frame.title = "원문 PDF 변환용 rhwp 렌더러";
     frame.style.position = "fixed";
     frame.style.left = "-10000px";
@@ -1369,9 +1369,15 @@ function RhwpStudioViewer({
       if (cancelled || !frameRef.current?.contentWindow) return;
       attempts += 1;
       if (initialBlank) {
-        triggerBlankDocument(frameRef.current);
-        setMessage("새 한글 문서를 열었습니다");
-        cancelled = true;
+        frameRef.current.contentWindow.postMessage(
+          {
+            type: "rhwp-request",
+            id: `blank-${Date.now()}`,
+            method: "createNewDocument",
+            params: {},
+          },
+          window.location.origin,
+        );
       } else if (buffer) {
         frameRef.current.contentWindow.postMessage(
           {
@@ -1454,7 +1460,7 @@ function RhwpStudioViewer({
       <iframe
         ref={frameRef}
         title={`${filename} 원문 뷰어`}
-        src="/rhwp-studio/index.html"
+        src="/rhwp-host.html"
         className="rhwp-frame"
         onLoad={() => setMessage("문서를 rhwp 뷰어로 전달 중")}
       />
@@ -1573,20 +1579,6 @@ function requestRhwp<T>(
       window.location.origin,
     );
   });
-}
-
-function triggerBlankDocument(frame: HTMLIFrameElement) {
-  const targetWindow = frame.contentWindow;
-  const targetDocument = targetWindow?.document;
-  if (!targetWindow || !targetDocument) return;
-  const event = new KeyboardEvent("keydown", {
-    key: "n",
-    code: "KeyN",
-    altKey: true,
-    bubbles: true,
-    cancelable: true,
-  });
-  targetDocument.dispatchEvent(event);
 }
 
 async function svgToPngDataUrl(svg: string) {

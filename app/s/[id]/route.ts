@@ -61,7 +61,7 @@ function renderSharePage(share: ShareRecord, requestUrl: string) {
   const originalFileUrl = new URL(`/api/shares/${share.id}/original-file`, url.origin);
   const originalFileDownloadUrl = new URL(`/api/shares/${share.id}/original-file`, url.origin);
   originalFileDownloadUrl.searchParams.set("download", "1");
-  const rhwpViewerUrl = new URL("/rhwp-studio/index.html", url.origin);
+  const rhwpViewerUrl = new URL("/rhwp-host.html", url.origin);
   rhwpViewerUrl.searchParams.set("url", originalFileUrl.toString());
   rhwpViewerUrl.searchParams.set("filename", share.sourceFilename || "document.hwp");
   const keyPoints = share.keyPoints.map((point) => `<li>${escapeHtml(point)}</li>`).join("");
