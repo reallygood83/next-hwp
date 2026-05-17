@@ -4,11 +4,14 @@ export type BriefingStyle = "work" | "study" | "news";
 
 export type SpeechProvider = "gemini" | "elevenlabs";
 
+export type BriefingLanguage = "ko" | "en" | "ja" | "zh";
+
 export type BriefingRequest = {
   filename: string;
   text: string;
   duration: BriefingDuration;
   style: BriefingStyle;
+  briefingLanguage?: BriefingLanguage;
   speechProvider?: SpeechProvider;
   geminiApiKey?: string;
   geminiTtsModel?: string;

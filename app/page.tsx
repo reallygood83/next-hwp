@@ -14,12 +14,13 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import { buildBriefingHtml } from "@/lib/html-export";
 import { extractTextFromFile } from "@/lib/hwpx";
 import type {
   BriefingDuration,
+  BriefingLanguage,
   BriefingResponse,
   BriefingResult,
   BriefingStyle,
@@ -52,15 +53,25 @@ const geminiVoices = [
 
 const elevenLabsModels = ["eleven_multilingual_v2", "eleven_flash_v2_5", "eleven_turbo_v2_5"];
 
+const briefingLanguages: Array<{ value: BriefingLanguage; label: string }> = [
+  { value: "ko", label: "한국어" },
+  { value: "en", label: "English" },
+  { value: "ja", label: "日本語" },
+  { value: "zh", label: "中文" },
+];
+
 export default function Home() {
   const [filename, setFilename] = useState("sample.txt");
   const [text, setText] = useState(sampleText);
   const [documentHtml, setDocumentHtml] = useState(sampleHtml);
+  const [documentBuffer, setDocumentBuffer] = useState<ArrayBuffer | null>(null);
+  const [documentKind, setDocumentKind] = useState<"hwp" | "hwpx" | "text">("text");
   const [documentStatus, setDocumentStatus] = useState<"ready" | "unsupported" | "empty">(
     "ready",
   );
   const [duration, setDuration] = useState<BriefingDuration>("standard");
   const [style, setStyle] = useState<BriefingStyle>("work");
+  const [briefingLanguage, setBriefingLanguage] = useState<BriefingLanguage>("ko");
   const [speechProvider, setSpeechProvider] = useState<SpeechProvider>("gemini");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [geminiTtsModel, setGeminiTtsModel] = useState("gemini-3.1-flash-tts-preview");
@@ -88,9 +99,15 @@ export default function Home() {
     setFilename(file.name);
 
     try {
+      const buffer = await file.arrayBuffer();
       const extracted = await extractTextFromFile(file);
+      const lowerName = file.name.toLowerCase();
       setText(extracted.text);
       setDocumentHtml(extracted.html || textToPreviewHtml(extracted.text));
+      setDocumentBuffer(buffer);
+      setDocumentKind(
+        lowerName.endsWith(".hwp") ? "hwp" : lowerName.endsWith(".hwpx") ? "hwpx" : "text",
+      );
       setDocumentStatus(extracted.status || (extracted.text.trim() ? "ready" : "empty"));
       setWarnings(extracted.warnings);
       setState("idle");
@@ -98,6 +115,30 @@ export default function Home() {
       setError("파일에서 텍스트를 추출하지 못했습니다.");
       setState("error");
     }
+  }
+
+  async function applyEditedHwp(bytes: Uint8Array) {
+    const editedName = safeBaseName(filename) + "-edited.hwp";
+    const buffer = toArrayBuffer(bytes);
+    const file = new File([buffer], editedName, { type: "application/x-hwp" });
+    const extracted = await extractTextFromFile(file);
+    setFilename(editedName);
+    setText(extracted.text);
+    setDocumentHtml(extracted.html || textToPreviewHtml(extracted.text));
+    setDocumentBuffer(buffer);
+    setDocumentKind("hwp");
+    setDocumentStatus(extracted.status || (extracted.text.trim() ? "ready" : "empty"));
+    setWarnings(extracted.warnings);
+    setResult(null);
+    setAudio(undefined);
+    setShareUrl("");
+  }
+
+  function downloadEditedHwp(bytes: Uint8Array) {
+    downloadBlob(
+      `${safeBaseName(filename)}-edited.hwp`,
+      new Blob([toArrayBuffer(bytes)], { type: "application/x-hwp" }),
+    );
   }
 
   async function createBriefing() {
@@ -116,6 +157,7 @@ export default function Home() {
           text,
           duration,
           style,
+          briefingLanguage,
           speechProvider,
           geminiApiKey: geminiApiKey.trim() || undefined,
           geminiTtsModel,
@@ -188,7 +230,7 @@ export default function Home() {
   function makeEmbeddedHtml() {
     if (!result) return "";
     return buildBriefingHtml(result, {
-      audioFilename: safeBaseName(filename) + "-briefing.mp3",
+      audioFilename: safeBaseName(filename) + "-briefing." + audioExtension(audio?.mimeType),
       embeddedAudio: audio,
       sourceHtml: documentHtml,
     });
@@ -266,8 +308,8 @@ export default function Home() {
                 onChange={(event) => void handleFile(event.currentTarget.files?.[0] || null)}
               />
               <p className="hint">
-                HWP/HWPX/TXT/MD 본문을 추출합니다. HWP는 텍스트 중심으로 표시하며
-                정밀 레이아웃은 HWPX 변환이 더 안정적입니다.
+                HWP/HWPX는 rhwp WASM 뷰어로 원문을 표시하고, 브리핑용 본문도 함께
+                추출합니다.
               </p>
             </div>
           </div>
@@ -307,6 +349,21 @@ export default function Home() {
                 <option value="news">뉴스형</option>
               </select>
             </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="briefingLanguage">브리핑 언어</label>
+            <select
+              id="briefingLanguage"
+              value={briefingLanguage}
+              onChange={(event) => setBriefingLanguage(event.target.value as BriefingLanguage)}
+            >
+              {briefingLanguages.map((language) => (
+                <option key={language.value} value={language.value}>
+                  {language.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="field">
@@ -434,6 +491,8 @@ export default function Home() {
               onClick={() => {
                 setText(sampleText);
                 setDocumentHtml(sampleHtml);
+                setDocumentBuffer(null);
+                setDocumentKind("text");
                 setDocumentStatus("ready");
                 setFilename("sample.txt");
               }}
@@ -449,6 +508,10 @@ export default function Home() {
             <DocumentPreview
               filename={filename}
               html={documentHtml}
+              buffer={documentBuffer}
+              kind={documentKind}
+              onApplyEditedHwp={(bytes) => void applyEditedHwp(bytes)}
+              onDownloadEditedHwp={downloadEditedHwp}
               text={text}
               status={documentStatus}
             />
@@ -469,6 +532,8 @@ export default function Home() {
                 <DocumentPreview
                   filename={filename}
                   html={documentHtml}
+                  buffer={documentBuffer}
+                  kind={documentKind}
                   text={text}
                   status={documentStatus}
                   compact
@@ -531,12 +596,20 @@ export default function Home() {
 function DocumentPreview({
   filename,
   html,
+  buffer,
+  kind = "text",
+  onApplyEditedHwp,
+  onDownloadEditedHwp,
   text,
   status,
   compact = false,
 }: {
   filename: string;
   html: string;
+  buffer?: ArrayBuffer | null;
+  kind?: "hwp" | "hwpx" | "text";
+  onApplyEditedHwp?: (bytes: Uint8Array) => void;
+  onDownloadEditedHwp?: (bytes: Uint8Array) => void;
   text: string;
   status: "ready" | "unsupported" | "empty";
   compact?: boolean;
@@ -558,34 +631,43 @@ function DocumentPreview({
             : `${text.trim().length.toLocaleString()}자`}
         </span>
       </div>
-      <div className={isUnsupported ? "doc-page unsupported" : "doc-page"}>
-        {isUnsupported ? (
-          <div className="doc-empty unsupported-state">
-            <AlertTriangle size={38} aria-hidden="true" />
-            <h1>이 파일은 바로 표시하지 못했습니다</h1>
-            <p>
-              HWP 텍스트 추출을 시도했지만 표시 가능한 본문을 찾지 못했습니다. 암호화,
-              배포용 문서, 일부 구형/복합 문서는 별도 변환기가 필요할 수 있습니다.
-            </p>
-            <div className="unsupported-actions">
-              <span>가능한 진행</span>
-              <ul>
-                <li>한글에서 HWPX로 저장한 뒤 업로드</li>
-                <li>본문을 왼쪽 텍스트 영역에 붙여넣기</li>
-                <li>rhwp/WASM 또는 서버-side 변환기 연결</li>
-              </ul>
+      {buffer && (kind === "hwp" || kind === "hwpx") && !compact ? (
+        <RhwpStudioViewer
+          buffer={buffer}
+          filename={filename}
+          onApplyEditedHwp={onApplyEditedHwp}
+          onDownloadEditedHwp={onDownloadEditedHwp}
+        />
+      ) : (
+        <div className={isUnsupported ? "doc-page unsupported" : "doc-page"}>
+          {isUnsupported ? (
+            <div className="doc-empty unsupported-state">
+              <AlertTriangle size={38} aria-hidden="true" />
+              <h1>이 파일은 바로 표시하지 못했습니다</h1>
+              <p>
+                HWP 텍스트 추출을 시도했지만 표시 가능한 본문을 찾지 못했습니다. 암호화,
+                배포용 문서, 일부 구형/복합 문서는 별도 변환기가 필요할 수 있습니다.
+              </p>
+              <div className="unsupported-actions">
+                <span>가능한 진행</span>
+                <ul>
+                  <li>한글에서 HWPX로 저장한 뒤 업로드</li>
+                  <li>본문을 왼쪽 텍스트 영역에 붙여넣기</li>
+                  <li>rhwp/WASM 또는 서버-side 변환기 연결</li>
+                </ul>
+              </div>
             </div>
-          </div>
-        ) : bodyHtml ? (
-          <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
-        ) : isEmpty ? (
-          <div className="doc-empty">
-            <FileAudio size={34} aria-hidden="true" />
-            <h1>문서 본문을 기다리고 있습니다</h1>
-            <p>HWPX 파일을 올리거나 본문을 붙여넣으면 문서 보기와 브리핑을 함께 만듭니다.</p>
-          </div>
-        ) : null}
-      </div>
+          ) : bodyHtml ? (
+            <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+          ) : isEmpty ? (
+            <div className="doc-empty">
+              <FileAudio size={34} aria-hidden="true" />
+              <h1>문서 본문을 기다리고 있습니다</h1>
+              <p>HWPX 파일을 올리거나 본문을 붙여넣으면 문서 보기와 브리핑을 함께 만듭니다.</p>
+            </div>
+          ) : null}
+        </div>
+      )}
       {isUnsupported ? (
         <p className="viewer-note">
           표시 가능한 원문이 없으면 왼쪽 텍스트 영역에 본문을 붙여넣어 브리핑을 만들 수 있습니다.
@@ -594,6 +676,117 @@ function DocumentPreview({
     </div>
   );
 }
+
+function RhwpStudioViewer({
+  buffer,
+  filename,
+  onApplyEditedHwp,
+  onDownloadEditedHwp,
+}: {
+  buffer: ArrayBuffer;
+  filename: string;
+  onApplyEditedHwp?: (bytes: Uint8Array) => void;
+  onDownloadEditedHwp?: (bytes: Uint8Array) => void;
+}) {
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const [message, setMessage] = useState("rhwp 뷰어 로딩 중");
+  const exportModeRef = useRef<"apply" | "download" | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+
+    const send = () => {
+      if (cancelled || !frameRef.current?.contentWindow) return;
+      attempts += 1;
+      frameRef.current.contentWindow.postMessage(
+        {
+          type: "hwpctl-load",
+          fileName: filename,
+          data: buffer.slice(0),
+        },
+        window.location.origin,
+      );
+      if (attempts < 8) {
+        window.setTimeout(send, 450);
+      }
+    };
+
+    const receive = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as {
+        type?: string;
+        result?: { pageCount?: number } | number[];
+        error?: string;
+      };
+      if (data?.type !== "rhwp-response") return;
+      if (data.error) {
+        setMessage(`rhwp 뷰어 오류: ${data.error}`);
+      } else if (Array.isArray(data.result)) {
+        const bytes = new Uint8Array(data.result);
+        const mode = exportModeRef.current;
+        exportModeRef.current = null;
+        if (mode === "download") {
+          onDownloadEditedHwp?.(bytes);
+          setMessage("편집본 HWP를 저장했습니다");
+        } else {
+          onApplyEditedHwp?.(bytes);
+          setMessage("편집본을 브리핑 입력에 반영했습니다");
+        }
+      } else {
+        const result = data.result as { pageCount?: number } | undefined;
+        setMessage(`${result?.pageCount || 1}쪽 원문 렌더링`);
+        cancelled = true;
+      }
+    };
+
+    window.addEventListener("message", receive);
+    const timer = window.setTimeout(send, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", receive);
+    };
+  }, [buffer, filename, onApplyEditedHwp, onDownloadEditedHwp]);
+
+  function requestExport(mode: "apply" | "download") {
+    exportModeRef.current = mode;
+    setMessage(mode === "apply" ? "편집본을 브리핑 입력으로 가져오는 중" : "편집본 HWP 저장 준비 중");
+    frameRef.current?.contentWindow?.postMessage(
+      {
+        type: "rhwp-request",
+        id: `export-${mode}-${Date.now()}`,
+        method: "exportHwp",
+        params: {},
+      },
+      window.location.origin,
+    );
+  }
+
+  return (
+    <div className="rhwp-viewer">
+      <div className="rhwp-viewer-status">
+        <span>{message}</span>
+        <div className="rhwp-viewer-actions">
+          <button type="button" onClick={() => requestExport("apply")}>
+            편집본 브리핑에 반영
+          </button>
+          <button type="button" onClick={() => requestExport("download")}>
+            편집본 HWP 저장
+          </button>
+        </div>
+      </div>
+      <iframe
+        ref={frameRef}
+        title={`${filename} 원문 뷰어`}
+        src="/rhwp-studio/index.html"
+        className="rhwp-frame"
+        onLoad={() => setMessage("문서를 rhwp 뷰어로 전달 중")}
+      />
+    </div>
+  );
+}
+
 function safeBaseName(filename: string) {
   return filename
     .replace(/\.[^.]+$/, "")
@@ -607,6 +800,12 @@ function audioExtension(mimeType?: string) {
   if (mimeType.includes("mpeg") || mimeType.includes("mp3")) return "mp3";
   if (mimeType.includes("wav")) return "wav";
   return "audio";
+}
+
+function toArrayBuffer(bytes: Uint8Array) {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 function textToPreviewHtml(value: string) {

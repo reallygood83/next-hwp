@@ -2,6 +2,7 @@ type ElevenLabsSpeechOptions = {
   apiKey?: string;
   voiceId?: string;
   modelId?: string;
+  languageCode?: string;
 };
 
 export async function synthesizeElevenLabsSpeech(
@@ -32,7 +33,7 @@ export async function synthesizeElevenLabsSpeech(
       body: JSON.stringify({
         text: text.slice(0, 4800),
         model_id: modelId,
-        language_code: "ko",
+        language_code: options.languageCode || "ko",
         voice_settings: {
           stability: 0.45,
           similarity_boost: 0.75,

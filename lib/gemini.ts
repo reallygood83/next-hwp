@@ -74,11 +74,13 @@ function buildPrompt(request: BriefingRequest) {
       : request.style === "study"
         ? "study note"
         : "news briefing";
+  const languageLabel = languageName(request.briefingLanguage || "ko");
 
   return [
-    "You create Korean voice briefings from HWP/HWPX document text.",
+    "You create voice briefings from HWP/HWPX document text.",
+    `Write every user-facing output in ${languageLabel}.`,
     "Do not invent facts that are not grounded in the source.",
-    "Write the briefingScript as natural Korean speech.",
+    `Write the briefingScript as natural ${languageLabel} speech.`,
     "htmlBody must be a safe fragment using only p, h2, ul, li, strong tags.",
     `Filename: ${request.filename}`,
     `Target length: ${durationLabel}`,
@@ -86,6 +88,13 @@ function buildPrompt(request: BriefingRequest) {
     "Source text:",
     request.text.slice(0, 42000),
   ].join("\n\n");
+}
+
+function languageName(language: NonNullable<BriefingRequest["briefingLanguage"]>) {
+  if (language === "en") return "English";
+  if (language === "ja") return "Japanese";
+  if (language === "zh") return "Chinese";
+  return "Korean";
 }
 
 function normalizeBriefing(value: Partial<BriefingResult>): BriefingResult {

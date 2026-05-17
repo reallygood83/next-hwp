@@ -24,6 +24,7 @@ export async function POST(request: Request) {
           apiKey: body.elevenLabsApiKey,
           voiceId: body.elevenLabsVoiceId,
           modelId: body.elevenLabsModelId,
+          languageCode: body.briefingLanguage || "ko",
         });
         if (!audio) {
           warnings.push("ElevenLabs API key or voice id is missing; audio was skipped.");
