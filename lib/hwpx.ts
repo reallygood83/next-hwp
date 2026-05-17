@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { extractTextFromHwp } from "./hwp";
 import type { ExtractionResult } from "./types";
 
 const TEXT_TAGS = new Set(["t", "hp:t", "text"]);
@@ -22,14 +23,7 @@ export async function extractTextFromFile(file: File): Promise<ExtractionResult>
   }
 
   if (name.endsWith(".hwp")) {
-    return {
-      text: "",
-      html: "",
-      status: "unsupported",
-      warnings: [
-        "이 MVP는 아직 HWP 바이너리 렌더링 bridge가 없습니다. HWPX로 변환하거나 본문을 붙여넣어 브리핑을 만들 수 있습니다.",
-      ],
-    };
+    return extractTextFromHwp(await file.arrayBuffer());
   }
 
   return {

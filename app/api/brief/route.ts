@@ -1,5 +1,6 @@
 import { createBriefing } from "@/lib/gemini";
-import { synthesizeSpeech } from "@/lib/elevenlabs";
+import { synthesizeGeminiSpeech } from "@/lib/gemini-tts";
+import { synthesizeElevenLabsSpeech } from "@/lib/elevenlabs";
 import type { BriefingRequest, BriefingResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -15,14 +16,34 @@ export async function POST(request: Request) {
     const briefing = await createBriefing(body);
     const warnings: string[] = [];
     let audio: BriefingResponse["audio"];
+    const provider = body.speechProvider || "gemini";
 
     try {
-      audio = await synthesizeSpeech(briefing.briefingScript, body.voiceId);
-      if (!audio) {
-        warnings.push("ElevenLabs API key or voice id is missing; audio was skipped.");
+      if (provider === "elevenlabs") {
+        audio = await synthesizeElevenLabsSpeech(briefing.briefingScript, {
+          apiKey: body.elevenLabsApiKey,
+          voiceId: body.elevenLabsVoiceId,
+          modelId: body.elevenLabsModelId,
+        });
+        if (!audio) {
+          warnings.push("ElevenLabs API key or voice id is missing; audio was skipped.");
+        }
+      } else {
+        audio = await synthesizeGeminiSpeech(briefing.briefingScript, {
+          apiKey: body.geminiApiKey,
+          model: body.geminiTtsModel,
+          voiceName: body.geminiVoiceName,
+        });
+        if (!audio) {
+          warnings.push("Gemini API key is missing; audio was skipped.");
+        }
       }
     } catch {
-      warnings.push("ElevenLabs synthesis failed; briefing text and HTML are still available.");
+      warnings.push(
+        provider === "elevenlabs"
+          ? "ElevenLabs synthesis failed; briefing text and HTML are still available."
+          : "Gemini TTS failed; briefing text and HTML are still available.",
+      );
     }
 
     const response: BriefingResponse = {

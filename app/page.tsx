@@ -23,6 +23,7 @@ import type {
   BriefingResponse,
   BriefingResult,
   BriefingStyle,
+  SpeechProvider,
 } from "@/lib/types";
 
 type WorkState = "idle" | "extracting" | "briefing" | "done" | "error";
@@ -31,6 +32,25 @@ const sampleText =
   "이 문서는 한글 문서를 빠르게 이해하기 위한 AI 음성 브리핑 기능 제안서입니다. 사용자는 HWP 또는 HWPX 문서를 열고 핵심 요약, 브리핑 대본, HTML 공유 파일, MP3 음성 파일을 생성할 수 있습니다. Gemini API는 구조화된 요약을 만들고 ElevenLabs API는 자연스러운 한국어 음성을 생성합니다. API 키는 안전하게 관리해야 하며 문서 내용이 외부 API로 전송된다는 점을 명확히 고지해야 합니다.";
 
 const sampleHtml = textToPreviewHtml(sampleText);
+
+const geminiTtsModels = [
+  { value: "gemini-3.1-flash-tts-preview", label: "Gemini 3.1 Flash TTS Preview" },
+  { value: "gemini-2.5-flash-preview-tts", label: "Gemini 2.5 Flash TTS Preview" },
+  { value: "gemini-2.5-pro-preview-tts", label: "Gemini 2.5 Pro TTS Preview" },
+];
+
+const geminiVoices = [
+  "Kore",
+  "Puck",
+  "Charon",
+  "Fenrir",
+  "Aoede",
+  "Leda",
+  "Orus",
+  "Zephyr",
+];
+
+const elevenLabsModels = ["eleven_multilingual_v2", "eleven_flash_v2_5", "eleven_turbo_v2_5"];
 
 export default function Home() {
   const [filename, setFilename] = useState("sample.txt");
@@ -41,7 +61,13 @@ export default function Home() {
   );
   const [duration, setDuration] = useState<BriefingDuration>("standard");
   const [style, setStyle] = useState<BriefingStyle>("work");
-  const [voiceId, setVoiceId] = useState("");
+  const [speechProvider, setSpeechProvider] = useState<SpeechProvider>("gemini");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [geminiTtsModel, setGeminiTtsModel] = useState("gemini-3.1-flash-tts-preview");
+  const [geminiVoiceName, setGeminiVoiceName] = useState("Kore");
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
+  const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState("");
+  const [elevenLabsModelId, setElevenLabsModelId] = useState("eleven_multilingual_v2");
   const [state, setState] = useState<WorkState>("idle");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -90,7 +116,13 @@ export default function Home() {
           text,
           duration,
           style,
-          voiceId: voiceId.trim() || undefined,
+          speechProvider,
+          geminiApiKey: geminiApiKey.trim() || undefined,
+          geminiTtsModel,
+          geminiVoiceName,
+          elevenLabsApiKey: elevenLabsApiKey.trim() || undefined,
+          elevenLabsVoiceId: elevenLabsVoiceId.trim() || undefined,
+          elevenLabsModelId,
         }),
       });
 
@@ -121,10 +153,10 @@ export default function Home() {
   }
 
   function downloadAudio() {
-    if (!audioUrl) return;
+    if (!audioUrl || !audio) return;
     const anchor = document.createElement("a");
     anchor.href = audioUrl;
-    anchor.download = safeBaseName(filename) + "-briefing.mp3";
+    anchor.download = safeBaseName(filename) + "-briefing." + audioExtension(audio.mimeType);
     anchor.click();
   }
 
@@ -133,7 +165,7 @@ export default function Home() {
     downloadTextFile(
       safeBaseName(filename) + "-briefing.html",
       buildBriefingHtml(result, {
-        audioFilename: safeBaseName(filename) + "-briefing.mp3",
+        audioFilename: safeBaseName(filename) + "-briefing." + audioExtension(audio?.mimeType),
         sourceHtml: documentHtml,
       }),
       "text/html;charset=utf-8",
@@ -145,7 +177,7 @@ export default function Home() {
     downloadTextFile(
       safeBaseName(filename) + "-briefing-embedded.html",
       buildBriefingHtml(result, {
-        audioFilename: safeBaseName(filename) + "-briefing.mp3",
+        audioFilename: safeBaseName(filename) + "-briefing." + audioExtension(audio?.mimeType),
         embeddedAudio: audio,
         sourceHtml: documentHtml,
       }),
@@ -190,13 +222,15 @@ export default function Home() {
     if (!result) return;
     const baseName = safeBaseName(filename);
     const html = buildBriefingHtml(result, {
-      audioFilename: `${baseName}-briefing.mp3`,
+      audioFilename: `${baseName}-briefing.${audioExtension(audio?.mimeType)}`,
       sourceHtml: documentHtml,
     });
     const zip = new JSZip();
     zip.file(`${baseName}-briefing.html`, html);
     if (audio) {
-      zip.file(`${baseName}-briefing.mp3`, audio.base64, { base64: true });
+      zip.file(`${baseName}-briefing.${audioExtension(audio.mimeType)}`, audio.base64, {
+        base64: true,
+      });
     }
     const blob = await zip.generateAsync({ type: "blob" });
     downloadBlob(`${baseName}-briefing-package.zip`, blob);
@@ -215,7 +249,7 @@ export default function Home() {
         </div>
         <span className="status-pill">
           <Sparkles size={15} aria-hidden="true" />
-          Gemini + ElevenLabs
+          Gemini TTS 기본
         </span>
       </header>
 
@@ -232,8 +266,8 @@ export default function Home() {
                 onChange={(event) => void handleFile(event.currentTarget.files?.[0] || null)}
               />
               <p className="hint">
-                HWPX/TXT/MD는 바로 추출합니다. HWP binary는 추출 bridge가 필요해
-                현재는 텍스트 붙여넣기로 진행합니다.
+                HWP/HWPX/TXT/MD 본문을 추출합니다. HWP는 텍스트 중심으로 표시하며
+                정밀 레이아웃은 HWPX 변환이 더 안정적입니다.
               </p>
             </div>
           </div>
@@ -276,14 +310,104 @@ export default function Home() {
           </div>
 
           <div className="field">
-            <label htmlFor="voice">ElevenLabs Voice ID</label>
-            <input
-              id="voice"
-              value={voiceId}
-              onChange={(event) => setVoiceId(event.target.value)}
-              placeholder="비워두면 서버 환경변수를 사용합니다."
-            />
+            <label htmlFor="speechProvider">음성 엔진</label>
+            <select
+              id="speechProvider"
+              value={speechProvider}
+              onChange={(event) => setSpeechProvider(event.target.value as SpeechProvider)}
+            >
+              <option value="gemini">Gemini TTS 기본</option>
+              <option value="elevenlabs">ElevenLabs 직접 입력</option>
+            </select>
           </div>
+
+          {speechProvider === "gemini" ? (
+            <div className="voice-box">
+              <div className="field">
+                <label htmlFor="geminiApiKey">Gemini API key</label>
+                <input
+                  id="geminiApiKey"
+                  type="password"
+                  autoComplete="off"
+                  value={geminiApiKey}
+                  onChange={(event) => setGeminiApiKey(event.target.value)}
+                  placeholder="비워두면 서버 환경변수 GEMINI_API_KEY를 사용합니다."
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="geminiTtsModel">TTS 모델</label>
+                <select
+                  id="geminiTtsModel"
+                  value={geminiTtsModel}
+                  onChange={(event) => setGeminiTtsModel(event.target.value)}
+                >
+                  {geminiTtsModels.map((model) => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="geminiVoiceName">Gemini 음성</label>
+                <select
+                  id="geminiVoiceName"
+                  value={geminiVoiceName}
+                  onChange={(event) => setGeminiVoiceName(event.target.value)}
+                >
+                  {geminiVoices.map((voice) => (
+                    <option key={voice} value={voice}>
+                      {voice}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="security-note">
+                API key는 저장하지 않고 이번 요청에만 서버로 전송합니다. 공유 HTML, ZIP,
+                링크에는 포함하지 않습니다.
+              </p>
+            </div>
+          ) : (
+            <div className="voice-box">
+              <div className="field">
+                <label htmlFor="elevenLabsApiKey">ElevenLabs API key</label>
+                <input
+                  id="elevenLabsApiKey"
+                  type="password"
+                  autoComplete="off"
+                  value={elevenLabsApiKey}
+                  onChange={(event) => setElevenLabsApiKey(event.target.value)}
+                  placeholder="비워두면 서버 환경변수 ELEVENLABS_API_KEY를 사용합니다."
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="elevenLabsVoiceId">ElevenLabs Voice ID</label>
+                <input
+                  id="elevenLabsVoiceId"
+                  value={elevenLabsVoiceId}
+                  onChange={(event) => setElevenLabsVoiceId(event.target.value)}
+                  placeholder="예: JBFqnCBsd6RMkjVDRZzb"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="elevenLabsModelId">ElevenLabs 모델</label>
+                <select
+                  id="elevenLabsModelId"
+                  value={elevenLabsModelId}
+                  onChange={(event) => setElevenLabsModelId(event.target.value)}
+                >
+                  {elevenLabsModels.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="security-note">
+                ElevenLabs 키와 Voice ID는 서버에 저장하지 않고 음성 생성 요청에만 사용합니다.
+              </p>
+            </div>
+          )}
 
           {warnings.map((warning) => (
             <div className="error" key={warning}>
@@ -295,7 +419,7 @@ export default function Home() {
           <div className="actions">
             <button
               className="primary"
-              disabled={isBusy || text.trim().length < 20 || documentStatus === "unsupported"}
+              disabled={isBusy || text.trim().length < 20}
               onClick={() => void createBriefing()}
             >
               {isBusy ? <Loader2 size={17} aria-hidden="true" /> : <FileAudio size={17} />}
@@ -357,12 +481,12 @@ export default function Home() {
                   <audio controls src={audioUrl} />
                 ) : (
                   <p className="hint">
-                    ElevenLabs API key가 없거나 음성 생성에 실패해 대본만 생성되었습니다.
+                    선택한 음성 엔진의 API key가 없거나 음성 생성에 실패해 대본만 생성되었습니다.
                   </p>
                 )}
                 <button className="secondary" disabled={!audioUrl} onClick={downloadAudio}>
                   <Download size={17} />
-                  MP3 저장
+                  오디오 저장
                 </button>
                 <button className="secondary" onClick={downloadHtml}>
                   <Package size={17} />
@@ -430,7 +554,7 @@ function DocumentPreview({
         </span>
         <span>
           {isUnsupported
-            ? "HWP 렌더링 준비 중"
+            ? "표시 불가"
             : `${text.trim().length.toLocaleString()}자`}
         </span>
       </div>
@@ -438,17 +562,17 @@ function DocumentPreview({
         {isUnsupported ? (
           <div className="doc-empty unsupported-state">
             <AlertTriangle size={38} aria-hidden="true" />
-            <h1>HWP 원문 렌더링은 아직 준비 중입니다</h1>
+            <h1>이 파일은 바로 표시하지 못했습니다</h1>
             <p>
-              현재 웹 MVP는 HWPX, TXT, Markdown의 본문 보기와 브리핑을 지원합니다.
-              이 HWP 파일을 바로 보려면 rhwp/WASM bridge 또는 서버-side 변환기가 필요합니다.
+              HWP 텍스트 추출을 시도했지만 표시 가능한 본문을 찾지 못했습니다. 암호화,
+              배포용 문서, 일부 구형/복합 문서는 별도 변환기가 필요할 수 있습니다.
             </p>
             <div className="unsupported-actions">
               <span>가능한 진행</span>
               <ul>
                 <li>한글에서 HWPX로 저장한 뒤 업로드</li>
                 <li>본문을 왼쪽 텍스트 영역에 붙여넣기</li>
-                <li>다음 단계에서 HWP parser bridge 연결</li>
+                <li>rhwp/WASM 또는 서버-side 변환기 연결</li>
               </ul>
             </div>
           </div>
@@ -464,7 +588,7 @@ function DocumentPreview({
       </div>
       {isUnsupported ? (
         <p className="viewer-note">
-          이 상태에서는 원문 텍스트가 없어서 AI 브리핑 버튼을 비활성화합니다.
+          표시 가능한 원문이 없으면 왼쪽 텍스트 영역에 본문을 붙여넣어 브리핑을 만들 수 있습니다.
         </p>
       ) : null}
     </div>
@@ -476,6 +600,13 @@ function safeBaseName(filename: string) {
     .replace(/[^a-zA-Z0-9가-힣._-]+/g, "-")
     .replace(/-+/g, "-")
     .slice(0, 80);
+}
+
+function audioExtension(mimeType?: string) {
+  if (!mimeType) return "wav";
+  if (mimeType.includes("mpeg") || mimeType.includes("mp3")) return "mp3";
+  if (mimeType.includes("wav")) return "wav";
+  return "audio";
 }
 
 function textToPreviewHtml(value: string) {

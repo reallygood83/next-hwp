@@ -1,15 +1,24 @@
-export async function synthesizeSpeech(text: string, voiceId?: string) {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+type ElevenLabsSpeechOptions = {
+  apiKey?: string;
+  voiceId?: string;
+  modelId?: string;
+};
+
+export async function synthesizeElevenLabsSpeech(
+  text: string,
+  options: ElevenLabsSpeechOptions = {},
+) {
+  const apiKey = options.apiKey?.trim() || process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     return undefined;
   }
 
-  const selectedVoiceId = voiceId || process.env.ELEVENLABS_VOICE_ID;
+  const selectedVoiceId = options.voiceId?.trim() || process.env.ELEVENLABS_VOICE_ID;
   if (!selectedVoiceId) {
     return undefined;
   }
 
-  const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+  const modelId = options.modelId?.trim() || process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
   const response = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(
       selectedVoiceId,

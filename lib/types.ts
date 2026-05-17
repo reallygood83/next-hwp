@@ -2,12 +2,20 @@ export type BriefingDuration = "short" | "standard" | "deep";
 
 export type BriefingStyle = "work" | "study" | "news";
 
+export type SpeechProvider = "gemini" | "elevenlabs";
+
 export type BriefingRequest = {
   filename: string;
   text: string;
   duration: BriefingDuration;
   style: BriefingStyle;
-  voiceId?: string;
+  speechProvider?: SpeechProvider;
+  geminiApiKey?: string;
+  geminiTtsModel?: string;
+  geminiVoiceName?: string;
+  elevenLabsApiKey?: string;
+  elevenLabsVoiceId?: string;
+  elevenLabsModelId?: string;
 };
 
 export type BriefingResult = {
