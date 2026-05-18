@@ -1,7 +1,23 @@
 import Link from "next/link";
 import { AlertTriangle, Download, FileAudio, Lock } from "lucide-react";
 
-const githubUrl = "https://github.com/reallygood83/next-hwp";
+const downloadUnavailableMessage = "정식 배포 시 오픈합니다.";
+
+function DisabledDownloadButton({ label }: { label: string }) {
+  return (
+    <span
+      className="secondary compact-button nav-link disabled-download"
+      role="button"
+      aria-disabled="true"
+      tabIndex={0}
+      title={downloadUnavailableMessage}
+      data-tooltip={downloadUnavailableMessage}
+    >
+      <Download size={16} />
+      {label}
+    </span>
+  );
+}
 
 export default function NoticePage() {
   return (
@@ -17,10 +33,7 @@ export default function NoticePage() {
           </span>
         </Link>
         <div className="nav-actions">
-          <a className="secondary compact-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
-            <Download size={16} />
-            GitHub 다운로드
-          </a>
+          <DisabledDownloadButton label="GitHub 다운로드" />
           <Link className="primary compact-button nav-link" href="/app">
             <Lock size={16} />
             작업페이지
@@ -88,9 +101,7 @@ export default function NoticePage() {
           <Link className="primary hero-button nav-link" href="/app">
             작업페이지로 이동
           </Link>
-          <a className="secondary compact-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
-            GitHub에서 직접 구축하기
-          </a>
+          <DisabledDownloadButton label="GitHub에서 직접 구축하기" />
         </div>
       </section>
     </main>

@@ -45,8 +45,8 @@ const sampleText =
   "이 문서는 한글 문서를 빠르게 이해하기 위한 AI 음성 브리핑 기능 제안서입니다. 사용자는 HWP 또는 HWPX 문서를 열고 핵심 요약, 브리핑 대본, HTML 공유 파일, MP3 음성 파일을 생성할 수 있습니다. Gemini API는 구조화된 요약을 만들고 ElevenLabs API는 자연스러운 한국어 음성을 생성합니다. API 키는 안전하게 관리해야 하며 문서 내용이 외부 API로 전송된다는 점을 명확히 고지해야 합니다.";
 
 const sampleHtml = textToPreviewHtml(sampleText);
-const githubUrl = "https://github.com/reallygood83/next-hwp";
 const youtubeUrl = "https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v";
+const downloadUnavailableMessage = "정식 배포 시 오픈합니다.";
 
 const geminiTtsModels = [
   { value: "gemini-2.5-flash-preview-tts", label: "Gemini 2.5 Flash TTS Preview" },
@@ -112,6 +112,30 @@ const briefingLanguages: Array<{ value: BriefingLanguage; label: string }> = [
   { value: "no", label: "Norsk" },
 ];
 
+function DisabledDownloadButton({
+  className = "secondary compact-button nav-link",
+  iconSize = 16,
+  label = "다운로드",
+}: {
+  className?: string;
+  iconSize?: number;
+  label?: string;
+}) {
+  return (
+    <span
+      className={`${className} disabled-download`}
+      role="button"
+      aria-disabled="true"
+      tabIndex={0}
+      title={downloadUnavailableMessage}
+      data-tooltip={downloadUnavailableMessage}
+    >
+      <Download size={iconSize} />
+      {label}
+    </span>
+  );
+}
+
 function LandingPage({
   authReady,
   authError,
@@ -138,10 +162,7 @@ function LandingPage({
           </span>
         </Link>
         <div className="nav-actions">
-          <a className="secondary compact-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
-            <Download size={16} />
-            다운로드
-          </a>
+          <DisabledDownloadButton />
           <Link className="secondary compact-button nav-link" href="/notice">
             <AlertTriangle size={16} />
             주의사항
@@ -767,10 +788,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
               <Link className="account-button nav-link" href="/my">
                 내 공유 문서
               </Link>
-              <a className="account-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
-                <Download size={14} />
-                다운로드
-              </a>
+              <DisabledDownloadButton className="account-button nav-link" iconSize={14} />
             </div>
           </header>
           <section className="auth-gate">
@@ -833,10 +851,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
             <Sparkles size={15} aria-hidden="true" />
             Gemini 2.5 TTS 기본
           </span>
-          <a className="account-button nav-link" href={githubUrl} target="_blank" rel="noreferrer">
-            <Download size={14} />
-            다운로드
-          </a>
+          <DisabledDownloadButton className="account-button nav-link" iconSize={14} />
           <Link className="account-button nav-link" href="/notice">
             <AlertTriangle size={14} />
             주의사항
