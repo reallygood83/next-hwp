@@ -1,4 +1,5 @@
 import { getShareById, storageMediaUrl } from "@/lib/firebase-rest";
+import { contentDisposition } from "@/lib/content-disposition";
 
 export const runtime = "nodejs";
 
@@ -29,7 +30,7 @@ export async function GET(
   return new Response(pdf, {
     headers: {
       "Content-Type": share.originalPdfMimeType || "application/pdf",
-      "Content-Disposition": `${disposition}; filename="${safeDownloadName(share.title)}-original.pdf"`,
+      "Content-Disposition": contentDisposition(disposition, `${safeDownloadName(share.title)}-original.pdf`),
       "Content-Length": String(pdf.byteLength),
       "Cache-Control": "private, max-age=0, no-store",
       "X-Content-Type-Options": "nosniff",

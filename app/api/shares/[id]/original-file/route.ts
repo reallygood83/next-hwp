@@ -1,4 +1,5 @@
 import { getShareById, storageMediaUrl } from "@/lib/firebase-rest";
+import { contentDisposition } from "@/lib/content-disposition";
 
 export const runtime = "nodejs";
 
@@ -29,7 +30,7 @@ export async function GET(
   return new Response(file, {
     headers: {
       "Content-Type": share.originalFileMimeType || "application/octet-stream",
-      "Content-Disposition": `${disposition}; filename="${safeDownloadName(share.sourceFilename || share.title)}"`,
+      "Content-Disposition": contentDisposition(disposition, safeDownloadName(share.sourceFilename || share.title)),
       "Content-Length": String(file.byteLength),
       "Cache-Control": "private, max-age=0, no-store",
       "X-Content-Type-Options": "nosniff",

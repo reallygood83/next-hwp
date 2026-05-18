@@ -1,4 +1,5 @@
 import { getShareById, storageMediaUrl, type ShareRecord } from "@/lib/firebase-rest";
+import { contentDisposition } from "@/lib/content-disposition";
 import { escapeHtml } from "@/lib/html-export";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ export async function GET(
     return new Response(renderSharePage(share, request.url), {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${safeDownloadName(share.title)}.html"`,
+        "Content-Disposition": contentDisposition("attachment", `${safeDownloadName(share.title)}.html`),
         "Cache-Control": "private, max-age=0, no-store",
         "X-Content-Type-Options": "nosniff",
       },

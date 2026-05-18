@@ -1,4 +1,5 @@
 import { getShareById, storageMediaUrl } from "@/lib/firebase-rest";
+import { contentDisposition } from "@/lib/content-disposition";
 
 export const runtime = "nodejs";
 
@@ -26,9 +27,10 @@ export async function GET(
   return new Response(audioResponse.body, {
     headers: {
       "Content-Type": share.audioMimeType || "audio/mpeg",
-      "Content-Disposition": `attachment; filename="${safeDownloadName(share.title)}.${audioExtension(
-        share.audioMimeType,
-      )}"`,
+      "Content-Disposition": contentDisposition(
+        "attachment",
+        `${safeDownloadName(share.title)}.${audioExtension(share.audioMimeType)}`,
+      ),
       "Cache-Control": "private, max-age=0, no-store",
       "X-Content-Type-Options": "nosniff",
     },
