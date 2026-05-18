@@ -3,6 +3,7 @@ import {
   createShareDocument,
   verifyFirebaseIdToken,
 } from "@/lib/firebase-rest";
+import { SHARE_SIZE_LIMIT_BYTES, SHARE_SIZE_LIMIT_MB } from "@/lib/share-limits";
 import type { BriefingResult, SpeechProvider } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -116,8 +117,8 @@ function validateShareBody(
   if (body.originalFilePath && !body.originalFilePath.startsWith(`briefings/${uid}/${body.id}/original.`)) {
     return "Invalid original file path.";
   }
-  if ((body.sizeBytes || 0) > 10 * 1024 * 1024) {
-    return "Shared files must be under 10MB.";
+  if ((body.sizeBytes || 0) > SHARE_SIZE_LIMIT_BYTES) {
+    return `공유 파일은 ${SHARE_SIZE_LIMIT_MB}MB 이하로 생성할 수 있습니다. 원문 PDF 또는 HWP 뷰어 공유 옵션을 끄고 다시 시도하세요.`;
   }
   return null;
 }

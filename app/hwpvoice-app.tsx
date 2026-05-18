@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { User } from "firebase/auth";
 import { buildBriefingHtml } from "@/lib/html-export";
+import { formatShareSize, SHARE_SIZE_LIMIT_BYTES, SHARE_SIZE_LIMIT_MB } from "@/lib/share-limits";
 import {
   firebaseStorage,
   getFirebaseAnalytics,
@@ -47,6 +48,10 @@ const sampleText =
 const sampleHtml = textToPreviewHtml(sampleText);
 const youtubeUrl = "https://www.youtube.com/@%EB%B0%B0%EC%9B%80%EC%9D%98%EB%8B%AC%EC%9D%B8-p5v";
 const downloadUnavailableMessage = "정식 배포 시 오픈합니다.";
+
+function shareSizeErrorMessage(currentBytes: number, reason: string) {
+  return `${reason} 현재 예상 공유 용량은 ${formatShareSize(currentBytes)}이며, 최대 ${SHARE_SIZE_LIMIT_MB}MB까지 생성할 수 있습니다. 원문 PDF 또는 HWP 뷰어 공유 옵션을 끄거나 로컬 저장을 사용하세요.`;
+}
 
 const geminiTtsModels = [
   { value: "gemini-2.5-flash-preview-tts", label: "Gemini 2.5 Flash TTS Preview" },
@@ -563,8 +568,8 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
         originalPreviewBlob = artifacts.previewBlob;
         uploadedBytes += originalPdfBlob.size;
         uploadedBytes += originalPreviewBlob.size;
-        if (uploadedBytes > 10 * 1024 * 1024) {
-          throw new Error("원문 PDF와 미리보기가 10MB 제한을 넘었습니다. PDF 포함 옵션을 끄고 공유하세요.");
+        if (uploadedBytes > SHARE_SIZE_LIMIT_BYTES) {
+          throw new Error(shareSizeErrorMessage(uploadedBytes, "원문 PDF와 미리보기만으로 공유 용량 제한을 넘었습니다."));
         }
       }
 
@@ -573,16 +578,16 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
           throw new Error("HWP 뷰어 공유는 HWP/HWPX 파일을 업로드한 경우에만 사용할 수 있습니다.");
         }
         uploadedBytes += documentBuffer.byteLength;
-        if (uploadedBytes > 10 * 1024 * 1024) {
-          throw new Error("원본 HWP/HWPX까지 포함하면 10MB 제한을 넘습니다. HWP 뷰어 공유 옵션을 끄세요.");
+        if (uploadedBytes > SHARE_SIZE_LIMIT_BYTES) {
+          throw new Error(shareSizeErrorMessage(uploadedBytes, "원본 HWP/HWPX까지 포함하면 공유 용량 제한을 넘습니다."));
         }
       }
 
       if (audio) {
         audioPath = `briefings/${user.uid}/${id}/briefing.${audioExtension(audio.mimeType)}`;
         uploadedBytes += Math.ceil((audio.base64.length * 3) / 4);
-        if (uploadedBytes > 10 * 1024 * 1024) {
-          throw new Error("공유 파일은 오디오와 원문 PDF를 합쳐 10MB 미만이어야 합니다. 로컬 저장을 사용하세요.");
+        if (uploadedBytes > SHARE_SIZE_LIMIT_BYTES) {
+          throw new Error(shareSizeErrorMessage(uploadedBytes, "오디오와 원문 파일을 합친 공유 용량이 제한을 넘었습니다."));
         }
         await uploadString(ref(firebaseStorage, audioPath), audio.base64, "base64", {
           contentType: audio.mimeType,
@@ -659,11 +664,14 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
       const shared = (await response.json()) as { id: string };
       setShareUrl(new URL(`/s/${shared.id}`, window.location.origin).toString());
     } catch (reason) {
-      setError(
+      const message =
         reason instanceof Error
           ? `공유 페이지를 만들지 못했습니다: ${reason.message}`
-          : "공유 페이지를 만들지 못했습니다.",
-      );
+          : "공유 페이지를 만들지 못했습니다.";
+      setError(message);
+      if (message.includes("공유 용량") || message.includes(`${SHARE_SIZE_LIMIT_MB}MB`)) {
+        window.alert(message);
+      }
     }
   }
 
@@ -1199,7 +1207,7 @@ export default function HwpVoiceApp({ mode = "workspace" }: { mode?: HwpVoiceApp
                   />
                   <span>
                     원문 PDF도 공유에 포함
-                    <small>HWP/HWPX 원문을 PDF로 변환해 공유 페이지에 표시합니다. 전체 공유 용량은 10MB 이하입니다.</small>
+                    <small>HWP/HWPX 원문을 PDF로 변환해 공유 페이지에 표시합니다. 전체 공유 용량은 {SHARE_SIZE_LIMIT_MB}MB 이하입니다.</small>
                   </span>
                 </label>
                 <label className="share-option">
